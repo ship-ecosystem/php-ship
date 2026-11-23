@@ -44,7 +44,7 @@ final class ElasticsearchService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'elasticsearch:9.5.5',
+                'image' => 'docker.elastic.co/elasticsearch/elasticsearch:9.5.7',
                 'environment' => [
                     // One node: no cluster formation, and Elasticsearch's production bootstrap
                     // checks (vm.max_map_count, ...) only warn instead of refusing to start.

@@ -38,7 +38,7 @@ final class MemcachedService implements ServiceDefinition, RequiresPhpExtensions
 
         return [
             $name => [
-                'image' => 'memcached:1.6-alpine',
+                'image' => 'memcached:1.6.44-alpine',
                 'healthcheck' => [
                     // The text protocol's `version` command: the server answers, not just the port.
                     'test' => ['CMD-SHELL', 'echo version | nc -w 2 127.0.0.1 11211 | grep -q "^VERSION"'],

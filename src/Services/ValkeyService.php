@@ -36,7 +36,7 @@ final class ValkeyService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'valkey/valkey:9.0-alpine',
+                'image' => 'valkey/valkey:9.2.0-alpine',
                 // Persisted, with RDB saves on, in both environments, as with Redis: losing every
                 // session on a redeploy logs out every user.
                 'command' => ['valkey-server', '--save', '60 1'],

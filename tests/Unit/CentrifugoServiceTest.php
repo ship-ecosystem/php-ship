@@ -22,7 +22,7 @@ final class CentrifugoServiceTest extends TestCase
         $service = new CentrifugoService();
 
         self::assertSame('broadcasting', $service->group());
-        self::assertMatchesRegularExpression('/^centrifugo\/centrifugo:v\d+\.\d+$/', $service->composeFragment(ShipEnvironment::Development)['centrifugo']['image']);
+        self::assertMatchesRegularExpression('/^centrifugo\/centrifugo:v\d+\.\d+\.\d+$/', $service->composeFragment(ShipEnvironment::Development)['centrifugo']['image']);
     }
 
     public function test_app_credentials_match_what_centrifugo_is_configured_with(): void

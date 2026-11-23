@@ -25,7 +25,7 @@ final class ValkeyServiceTest extends TestCase
     {
         $fragment = (new ValkeyService())->composeFragment(ShipEnvironment::Production)['valkey'];
 
-        self::assertMatchesRegularExpression('/^valkey\/valkey:\d+\.\d+-alpine$/', $fragment['image']);
+        self::assertMatchesRegularExpression('/^valkey\/valkey:\d+\.\d+\.\d+-alpine$/', $fragment['image']);
         self::assertSame(['valkey-server', '--save', '60 1'], $fragment['command']);
         self::assertSame(['ship-valkey-data:/data'], $fragment['volumes']);
         self::assertSame(['CMD', 'valkey-cli', 'ping'], $fragment['healthcheck']['test']);

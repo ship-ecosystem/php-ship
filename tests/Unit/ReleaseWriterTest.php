@@ -303,8 +303,8 @@ final class ReleaseWriterTest extends TestCase
         $compose = Yaml::parseFile($release['destination'] . '/docker-compose.yml');
 
         self::assertSame([
-            ['ref' => 'postgres:18-alpine@sha256:' . FakeReleaseDocker::digestFor('postgres:18-alpine'), 'services' => ['postgres']],
-            ['ref' => 'redis:8-alpine@sha256:' . FakeReleaseDocker::digestFor('redis:8-alpine'), 'services' => ['redis']],
+            ['ref' => 'postgres:18.7-alpine@sha256:' . FakeReleaseDocker::digestFor('postgres:18.7-alpine'), 'services' => ['postgres']],
+            ['ref' => 'redis:8.10.3-alpine3.23@sha256:' . FakeReleaseDocker::digestFor('redis:8.10.3-alpine3.23'), 'services' => ['redis']],
         ], $release['manifest']['pulledImages']);
         self::assertSame($release['manifest']['pulledImages'][0]['ref'], $compose['services']['postgres']['image']);
         self::assertArrayNotHasKey('build', $compose['services']['app']);
@@ -312,13 +312,13 @@ final class ReleaseWriterTest extends TestCase
 
     public function test_an_image_without_a_repository_digest_fails_and_writes_nothing(): void
     {
-        $docker = new FakeReleaseDocker(withoutDigest: ['redis:8-alpine']);
+        $docker = new FakeReleaseDocker(withoutDigest: ['redis:8.10.3-alpine3.23']);
 
         try {
             $this->release(docker: $docker);
             self::fail('Expected the release to fail.');
         } catch (ReleaseFailed $e) {
-            self::assertStringContainsString('redis:8-alpine has no repository digest', $e->getMessage());
+            self::assertStringContainsString('redis:8.10.3-alpine3.23 has no repository digest', $e->getMessage());
         }
 
         $this->assertNoReleaseOrStaging('1.5.0');

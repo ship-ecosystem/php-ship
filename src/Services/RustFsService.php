@@ -42,7 +42,7 @@ final class RustFsService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'rustfs/rustfs:1.0.0',
+                'image' => 'rustfs/rustfs:1.0.6',
                 'environment' => [
                     // Must match environmentVariables() below, or "app" authenticates with
                     // credentials RustFS never provisioned. Overridable defaults; the secret key

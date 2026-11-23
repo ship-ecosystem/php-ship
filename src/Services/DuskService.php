@@ -39,7 +39,7 @@ final class DuskService implements ServiceDefinition, NeedsAppUrl
             'selenium' => [
                 // Pinned to an exact version: a Chrome upgrade can change test behaviour, so
                 // bump it deliberately.
-                'image' => 'selenium/standalone-chrome:4.49.0',
+                'image' => 'selenium/standalone-chrome:4.53.0-20261120',
                 'shm_size' => '2gb',
             ],
         ];

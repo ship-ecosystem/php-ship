@@ -35,7 +35,7 @@ final class PostgresService implements ServiceDefinition, ProvidesDatabaseShell
 
         return [
             $name => [
-                'image' => 'postgres:18-alpine',
+                'image' => 'postgres:18.7-alpine',
                 'environment' => [
                     'POSTGRES_DB' => "\${{$prefix}DB_DATABASE:-app}",
                     'POSTGRES_USER' => "\${{$prefix}DB_USERNAME:-app}",

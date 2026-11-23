@@ -40,7 +40,7 @@ final class MailpitService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'axllent/mailpit:v1.31',
+                'image' => 'axllent/mailpit:v1.34.0',
                 // Only the default instance publishes its web UI: there's no collision-free
                 // default host port for named instances. Publish one via
                 // docker-compose.override.yml if needed.

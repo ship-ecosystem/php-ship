@@ -34,7 +34,7 @@ final class MeilisearchService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'getmeili/meilisearch:v1.53',
+                'image' => 'getmeili/meilisearch:v1.57.0',
                 'environment' => [
                     // A default in dev, required in production (see RequiredEnv).
                     'MEILI_MASTER_KEY' => RequiredEnv::expr("{$prefix}MEILISEARCH_KEY", 'shipsearchkey', $environment),

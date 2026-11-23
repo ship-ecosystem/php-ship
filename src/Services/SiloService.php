@@ -60,7 +60,7 @@ final class SiloService implements ServiceDefinition, ConfigAwareService
         return [
             $name => [
                 // One literal for both variants, so Renovate bumps them together.
-                'image' => 'pgsty/silo:RELEASE.2026-09-16T00-00-00Z' . $this->imageTagSuffix(),
+                'image' => 'pgsty/silo:RELEASE.2026-11-12T00-00-00Z' . $this->imageTagSuffix(),
                 'command' => ['server', '/data', '--console-address', ':9001'],
                 'environment' => [
                     // Must match environmentVariables() below, or "app" authenticates with

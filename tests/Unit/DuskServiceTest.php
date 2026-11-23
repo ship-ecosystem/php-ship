@@ -32,7 +32,7 @@ final class DuskServiceTest extends TestCase
         $fragment = (new DuskService())->composeFragment(ShipEnvironment::Development);
 
         self::assertMatchesRegularExpression(
-            '/^selenium\/standalone-chrome:\d+\.\d+\.\d+$/',
+            '/^selenium\/standalone-chrome:\d+\.\d+\.\d+-\d{8}$/',
             $fragment['selenium']['image'],
         );
     }

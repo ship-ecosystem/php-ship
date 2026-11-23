@@ -35,7 +35,7 @@ final class MySqlService implements ServiceDefinition, ProvidesDatabaseShell
 
         return [
             $name => [
-                'image' => 'mysql:9.7',
+                'image' => 'mysql:9.7.4',
                 'environment' => [
                     'MYSQL_DATABASE' => "\${{$prefix}DB_DATABASE:-app}",
                     'MYSQL_USER' => "\${{$prefix}DB_USERNAME:-app}",

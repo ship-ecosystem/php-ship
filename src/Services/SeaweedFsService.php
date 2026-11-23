@@ -42,7 +42,7 @@ final class SeaweedFsService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'chrislusf/seaweedfs:4.46',
+                'image' => 'chrislusf/seaweedfs:4.47',
                 // Replaces the image's ENTRYPOINT (the `weed` binary) so the identity file can be
                 // generated at boot.
                 'entrypoint' => ['/bin/sh', '-c'],

@@ -37,7 +37,7 @@ final class RabbitMqService implements ServiceDefinition
     {
         return [
             'rabbitmq' => [
-                'image' => 'rabbitmq:4.4-management-alpine',
+                'image' => 'rabbitmq:4.4.1-management-alpine',
                 // RabbitMQ keeps its data under a node name derived from the hostname. Compose's
                 // default hostname is the container id, which changes whenever the container is
                 // recreated, so the persisted queues would be orphaned on every redeploy.

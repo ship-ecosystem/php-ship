@@ -59,7 +59,7 @@ final class MongoDbService implements ServiceDefinition, ProvidesDatabaseShell, 
 
         return [
             $name => [
-                'image' => 'mongo:9.0',
+                'image' => 'mongo:9.0.8',
                 'entrypoint' => [
                     'sh',
                     '-c',

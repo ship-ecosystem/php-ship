@@ -36,7 +36,7 @@ final class MemcachedServiceTest extends TestCase
     {
         $fragment = (new MemcachedService())->composeFragment(ShipEnvironment::Development)['memcached'];
 
-        self::assertMatchesRegularExpression('/^memcached:\d+\.\d+-alpine$/', $fragment['image']);
+        self::assertMatchesRegularExpression('/^memcached:\d+\.\d+\.\d+-alpine$/', $fragment['image']);
         self::assertSame(['CMD-SHELL', 'echo version | nc -w 2 127.0.0.1 11211 | grep -q "^VERSION"'], $fragment['healthcheck']['test']);
     }
 

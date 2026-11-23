@@ -76,7 +76,7 @@ final class CentrifugoService implements ServiceDefinition, ExposesHttp, ConfigA
     {
         return [
             'centrifugo' => [
-                'image' => 'centrifugo/centrifugo:v6.10',
+                'image' => 'centrifugo/centrifugo:v6.10.3',
                 'environment' => [
                     // Defaults in dev, required in production (see RequiredEnv).
                     'CENTRIFUGO_HTTP_API_KEY' => RequiredEnv::expr('CENTRIFUGO_API_KEY', 'ship-centrifugo-api-key', $environment),

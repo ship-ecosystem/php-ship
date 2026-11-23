@@ -32,7 +32,7 @@ final class RedisService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'redis:8-alpine',
+                'image' => 'redis:8.10.3-alpine3.23',
                 // Persisted, with RDB saves on, in both environments: losing every session on a
                 // redeploy logs out every user.
                 'command' => ['redis-server', '--save', '60 1'],
