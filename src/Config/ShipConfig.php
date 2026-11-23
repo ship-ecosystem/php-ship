@@ -11,6 +11,8 @@ use RuntimeException;
  */
 final class ShipConfig
 {
+    public const DEFAULT_PHP_VERSION = '8.5';
+
     /**
      * A PHP branch or exact release ("8.4", "8.4.12"): ship.schema.json's pattern for "php".
      */
@@ -161,7 +163,7 @@ final class ShipConfig
          * } $data
          */
         return new self(
-            phpVersion: $data['php'] ?? '8.4',
+            phpVersion: $data['php'] ?? self::DEFAULT_PHP_VERSION,
             services: $data['services'] ?? [],
             extensions: $data['extensions'] ?? [],
             nodeVersion: $data['node'] ?? '24',
@@ -187,7 +189,7 @@ final class ShipConfig
      * filtered by type only, so a badly formatted one is written back as-is and reported by the
      * next command that validates. Returns null only when the file is missing or isn't JSON.
      *
-     * `phpVersion` is a placeholder, since `ship init` always re-prompts for it.
+     * Keep a recognizable PHP version as the default when `ship init` re-prompts for it.
      */
     public static function tryFromFile(string $path): ?self
     {
@@ -206,7 +208,9 @@ final class ShipConfig
         }
 
         return new self(
-            phpVersion: '8.4',
+            phpVersion: is_string($data['php'] ?? null) && preg_match(self::PHP_VERSION_PATTERN, $data['php']) === 1
+                ? $data['php']
+                : self::DEFAULT_PHP_VERSION,
             services: self::filterStringMap($data['services'] ?? null),
             extensions: self::filterStringList($data['extensions'] ?? null),
             additionalServices: self::filterAdditionalServices($data['additionalServices'] ?? null),

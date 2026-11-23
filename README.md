@@ -14,7 +14,7 @@ requiring Windows users to put their project inside WSL.
 against a real Docker daemon in both dev and production mode — including
 a real production HTTP request, a real database, and a real crashed-
 container recovery. CI passes on every push, across Ubuntu/macOS/Windows
-x PHP 8.2 to 8.5, plus a separate job that runs the same dev/production
+x PHP 8.2 to 8.6, plus a separate job that runs the same dev/production
 verification against a real Docker daemon on every commit.
 
 ## Contents
@@ -490,6 +490,9 @@ a deployment tool knows it may supply them.
 | php-fpm + nginx (default, no runtime selected) | `app` runs php-fpm behind a `webserver` nginx container, which also serves the built static assets | Nothing |
 | Octane (Swoole/RoadRunner/FrankenPHP) | `swoole` PHP extension (Swoole only), `OCTANE_SERVER` | `composer require laravel/octane`, then `php artisan octane:install` inside the container once (downloads the RoadRunner binary if that's the one picked) |
 
+Swoole 6.2.6 supports PHP through 8.5. For PHP 8.6, choose PHP-FPM,
+RoadRunner, or FrankenPHP.
+
 ### Browser testing (`testing`)
 
 | Service | Wired automatically | Still needed in the app |
@@ -565,7 +568,7 @@ plain, readable JSON document:
 ```json
 {
     "$schema": "https://raw.githubusercontent.com/ship-ecosystem/spec/main/schemas/ship.schema.json",
-    "php": "8.4",
+    "php": "8.5",
     "node": "24",
     "services": {
         "database": "postgres",
@@ -586,9 +589,10 @@ plain, readable JSON document:
   field names below mean the same thing in all of them; this package keeps a
   copy in `schema/` that CI checks is identical.
 - `php` — the PHP version built into the image (`ARG PHP_VERSION` in
-  `ship/Dockerfile`). Keep it a bare branch (`"8.4"`) so every build gets
-  that branch's latest patch release. See [PHP security
-  floor](#php-security-floor) for the versions ship refuses.
+  `ship/Dockerfile`). New projects default to `"8.5"`. Use a branch such
+  as `"8.5"` or `"8.6"` to pick up its patch releases when the base image
+  is pulled. PHP 8.6 currently uses preview releases of phpredis and, in
+  development, Xdebug. See [PHP security floor](#php-security-floor).
 - `node` — the Node.js major version built into the image (`ARG
   NODE_VERSION`), independent of whether the `frontend` group's Node
   service is selected — Node installs unconditionally either way (see
@@ -970,21 +974,18 @@ same one with a flag flipped:
 
 ### PHP security floor
 
-ship refuses to build on a PHP release with known security
-vulnerabilities. The current floor comes from the October 2026 critical
-releases, which fixed two unauthenticated remote code execution bugs:
-[CVE-2026-109618](https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w)
-(OOM corruption) and
-[CVE-2026-109619](https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp)
-(stale global state).
+The minimum PHP versions come from the [November 19, 2026 security
+releases](https://www.php.net/ChangeLog-8.php#8.5.13). They include fixes for
+[FastCGI request smuggling](https://github.com/php/php-src/security/advisories/GHSA-qc49-hpvq-g2w6)
+and [corrupted session files](https://github.com/php/php-src/security/advisories/GHSA-fm2m-fjf5-v3cp).
 
 | Branch | Oldest release ship builds on |
 | --- | --- |
-| 8.2 | 8.2.35 |
-| 8.3 | 8.3.36 |
-| 8.4 | 8.4.27 |
-| 8.5 | 8.5.12 |
-| 8.6 (pre-release) | 8.6.0RC4 |
+| 8.2 | 8.2.36 |
+| 8.3 | 8.3.37 |
+| 8.4 | 8.4.28 |
+| 8.5 | 8.5.13 |
+| 8.6 | 8.6.0 |
 | 8.1 and older | none (end of life, no upstream fixes) |
 
 It is enforced at three points:
@@ -1005,12 +1006,19 @@ It is enforced at three points:
 Both `php.ini` overlays also set `session.upload_progress.enabled=Off`,
 which PHP's advisory recommends keeping off even on patched releases when
 nothing uses it. The production overlay sets `fatal_error_backtraces=Off`,
-which only exists on PHP 8.5 and is ignored on older branches.
+a setting introduced in PHP 8.5.
 
 The Dockerfile check is part of the published `ship/Dockerfile`, which only
 `ship init` writes; `ship up` warns when the published stubs are older than
 the installed ship. The floor lives in `Ship\Support\PhpSecurityFloor`,
 raised whenever php.net ships a security release.
+
+The bundled nginx image is pinned to `1.30.7-alpine` in development and
+production, which includes the [November 18 HTTP/2 security fixes](https://nginx.org/2026.html).
+The bundled listener uses HTTP/1.1. For an existing project, refresh its
+published stubs with `ship init` or update the nginx pin in its custom
+Dockerfile, then rebuild. For production, deploy a new release so the
+running PHP and nginx containers use the updated images.
 
 ### `.env.production`
 

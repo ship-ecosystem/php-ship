@@ -6,8 +6,8 @@
 // ship.json's "php" is a branch ("8.4"), and Docker keeps building on whatever php:8.4 image is
 // cached locally, so this checks the PHP actually in the image rather than the configured version.
 //
-// PHP_SECURITY_FLOOR is the first patched release per branch, oldest branch first ("8.2.35 8.3.36
-// ..."), from Ship\Support\PhpSecurityFloor via the generated compose file. Empty skips the check.
+// PHP_SECURITY_FLOOR lists the minimum versions from Ship\Support\PhpSecurityFloor, oldest branch
+// first, via the generated compose file. Empty skips the check.
 // The optional argument stands in for PHP_VERSION, for tests.
 
 $version = $argv[1] ?? PHP_VERSION;

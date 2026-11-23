@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.2', '8.3', '8.4', '8.5', '8.6']
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -38,11 +38,10 @@ jobs:
         run: composer analyse
 
       - name: Coding standards
+        # PHP CS Fixer currently supports running through PHP 8.5.
+        if: matrix.php != '8.6'
         run: composer cs-check
 
-  # docker-build below only exercises PHP 8.4. This builds the app image's dev stage (base +
-  # Xdebug) on every supported branch, so a branch-specific break -- like OPcache becoming
-  # built-in on 8.5 -- fails here.
   # ship-ecosystem/spec is the source of truth for the shared contracts; schema/ holds this
   # package's copies, so its tests run offline. A contract change lands in the spec first, and this
   # job fails until the copies are synced.
@@ -59,13 +58,19 @@ jobs:
             diff -u "/tmp/spec-$file" "schema/$file"
           done
 
+  # Build the actual dev images on every PHP branch and check the PHP 8.6 FrankenPHP path.
   base-image:
-    name: App image — PHP ${{ matrix.php }}
+    name: App image — PHP ${{ matrix.php }} (${{ matrix.runtime }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.2', '8.3', '8.4', '8.5', '8.6']
+        runtime: [fpm]
+        include:
+          - php: '8.6'
+            runtime: frankenphp
+            dockerfile: Dockerfile.frankenphp
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -73,7 +78,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           coverage: none
 
       - name: Install ship's own dependencies
@@ -85,13 +90,17 @@ jobs:
           mkdir -p /tmp/ci-base-image/ship
           cp -r stubs/docker/php/. /tmp/ci-base-image/ship/
           floor=$(php -r 'require "vendor/autoload.php"; echo Ship\Support\PhpSecurityFloor::buildArg();')
-          docker build -t ci-base-image -f /tmp/ci-base-image/ship/Dockerfile --target dev \
+          docker build --pull -t ci-base-image -f "/tmp/ci-base-image/ship/${{ matrix.dockerfile || 'Dockerfile' }}" --target dev \
             --build-arg PHP_VERSION=${{ matrix.php }} --build-arg PHP_SECURITY_FLOOR="$floor" \
             /tmp/ci-base-image
 
       - name: The image has OPcache and every fixed extension
         run: |
-          docker run --rm --entrypoint php ci-base-image -d opcache.enable_cli=1 -r '
+          docker run --rm -e "EXPECTED_PHP_BRANCH=${{ matrix.php }}" --entrypoint php ci-base-image -d opcache.enable_cli=1 -r '
+            if (PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION !== getenv("EXPECTED_PHP_BRANCH")) {
+                fwrite(STDERR, "unexpected PHP version: " . PHP_VERSION . "\n");
+                exit(1);
+            }
             foreach (["pdo_pgsql", "pdo_mysql", "intl", "mbstring", "pcntl", "zip", "sockets", "redis", "xdebug"] as $ext) {
                 if (!extension_loaded($ext)) { fwrite(STDERR, "missing: $ext\n"); exit(1); }
             }
@@ -108,7 +117,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
-          php-version: '8.4'
+          php-version: '8.5'
           coverage: none
 
       - name: Install ship's own dependencies
@@ -125,9 +134,10 @@ jobs:
         run: |
           # The name (its default), the checklist of kinds, a service for each, no extra instances,
           # none of the suggested processes nor one of our own, no extra PHP extensions,
-          # no external networks, PHP, Node, package manager.
-          printf '\nDatabase,Cache\nMySQL\nRedis\nno\nNone\nno\n\n\n8.4\n\n\n' \
+          # no external networks, default PHP, Node, and package manager.
+          printf '\nDatabase,Cache\nMySQL\nRedis\nno\nNone\nno\n\n\n\n\n\n' \
             | php "$GITHUB_WORKSPACE/bin/ship" init
+          php -r 'exit(json_decode(file_get_contents("ship.json"), true)["php"] === "8.5" ? 0 : 1);'
 
       - name: Point .env at the ship-provisioned services
         working-directory: /tmp/ci-fixture
@@ -159,6 +169,7 @@ jobs:
         working-directory: /tmp/ci-fixture
         run: |
           php "$GITHUB_WORKSPACE/bin/ship" up
+          php "$GITHUB_WORKSPACE/bin/ship" exec webserver nginx -v
           php "$GITHUB_WORKSPACE/bin/ship" exec app php artisan migrate --force
           for i in $(seq 1 10); do
             code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:80/ || true)
@@ -231,7 +242,7 @@ jobs:
           '
 
       - name: The release passes ship-ecosystem/spec's checker
-        uses: ship-ecosystem/spec@be4cc80ad4ea6f3e60330255d8e000686a925fba # main
+        uses: ship-ecosystem/spec@db16bbc24e5a3e66c3a8c10ec42a63042859b1dc
         with:
           path: /tmp/ci-fixture/dist/ship/ci-test
 
@@ -285,8 +296,8 @@ jobs:
       - name: ship init (MySQL + Redis + Octane/Swoole)
         working-directory: /tmp/ci-fixture-swoole
         run: |
-          # As above, with Swoole as the runtime.
-          printf '\nDatabase,Cache,Application runtime\nMySQL\nRedis\nOctane (Swoole) — default\nno\nNone\nno\n\n\n8.4\n\n\n' \
+          # As above, with Swoole as the runtime (PHP 8.5).
+          printf '\nDatabase,Cache,Application runtime\nMySQL\nRedis\nOctane (Swoole) — default\nno\nNone\nno\n\n\n\n\n\n' \
             | php "$GITHUB_WORKSPACE/bin/ship" init
 
       - name: Point .env at the ship-provisioned services (Swoole fixture)
@@ -363,8 +374,8 @@ jobs:
         run: |
           # The name (its default), the checklist of kinds, a service for each, no extra instances,
           # none of the suggested processes nor one of our own, no extra PHP extensions,
-          # no external networks, PHP, Node, package manager.
-          printf '\nDatabase,Cache\nMySQL\nRedis\nno\nNone\nno\n\n\n8.4\n\n\n' \
+          # no external networks, default PHP, Node, and package manager.
+          printf '\nDatabase,Cache\nMySQL\nRedis\nno\nNone\nno\n\n\n\n\n\n' \
             | php "$GITHUB_WORKSPACE/bin/ship" init
 
       - name: Point .env at the ship-provisioned services (Mutagen fixture)

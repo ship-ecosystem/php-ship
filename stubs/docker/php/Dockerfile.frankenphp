@@ -1,7 +1,7 @@
 # FrankenPHP has its own base image (Debian + Caddy + embedded PHP), so this mirrors the
 # dev/builder/assets/prod stages of stubs/docker/php/Dockerfile without sharing it.
 
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 ARG NODE_VERSION=24
 
 FROM node:${NODE_VERSION}-bookworm-slim AS node
@@ -16,10 +16,20 @@ ARG PHP_SECURITY_FLOOR=""
 COPY ship/check-php-security-floor.php /usr/local/share/ship/check-php-security-floor.php
 RUN SHIP_BASE_IMAGE="dunglas/frankenphp:1-php${PHP_VERSION}-bookworm" php /usr/local/share/ship/check-php-security-floor.php
 
-# The same unconditional extension set as the main Dockerfile, with redis pinned the same way.
+# The same unconditional extension set as the main Dockerfile.
 # opcache is built into PHP 8.5; install-php-extensions only warns that it's already installed.
-ARG REDIS_EXTENSION_VERSION=6.3.0
-RUN install-php-extensions pdo_pgsql pdo_mysql intl mbstring opcache redis-$REDIS_EXTENSION_VERSION pcntl zip sockets
+RUN install-php-extensions pdo_pgsql pdo_mysql intl mbstring opcache pcntl zip sockets
+
+# Use the same installer release as the Alpine image for third-party extensions.
+ARG INSTALL_PHP_EXTENSIONS_VERSION=2.13.3
+ARG INSTALL_PHP_EXTENSIONS_SHA256=d7ecb2087962a272c1d9806069ff6095cd25bf6553d7452db2007db5fa11875f
+RUN curl -fsSL "https://github.com/mlocati/docker-php-extension-installer/releases/download/${INSTALL_PHP_EXTENSIONS_VERSION}/install-php-extensions" -o /usr/local/bin/install-php-extensions \
+    && echo "${INSTALL_PHP_EXTENSIONS_SHA256}  /usr/local/bin/install-php-extensions" | sha256sum -c - \
+    && chmod +x /usr/local/bin/install-php-extensions
+
+COPY ship/install-ship-extension.sh /usr/local/share/ship/install-ship-extension.sh
+ARG REDIS_EXTENSION_VERSION=""
+RUN sh /usr/local/share/ship/install-ship-extension.sh redis "$REDIS_EXTENSION_VERSION"
 
 # ship.json's phpExtensions. install-php-extensions is already in this base image.
 ARG PHP_EXTENSIONS=""
@@ -48,9 +58,8 @@ WORKDIR /var/www/html
 
 # ---- dev -------------------------------------------------------------
 FROM base AS dev
-# Pinned to an exact release, as in the main Dockerfile.
-ARG XDEBUG_EXTENSION_VERSION=3.5.3
-RUN install-php-extensions xdebug-$XDEBUG_EXTENSION_VERSION
+ARG XDEBUG_EXTENSION_VERSION=""
+RUN sh /usr/local/share/ship/install-ship-extension.sh xdebug "$XDEBUG_EXTENSION_VERSION"
 COPY ship/dev/php.ini /usr/local/etc/php/conf.d/99-ship-dev.ini
 COPY --from=composer:2.10.3 /usr/bin/composer /usr/bin/composer
 COPY ship/dev/entrypoint.sh /usr/local/bin/ship-entrypoint

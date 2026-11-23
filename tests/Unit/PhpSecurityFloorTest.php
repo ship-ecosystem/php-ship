@@ -16,15 +16,13 @@ use Symfony\Component\Process\Process;
  */
 final class PhpSecurityFloorTest extends TestCase
 {
-    /**
-     * CVE-2026-109618 and CVE-2026-109619 were fixed in these releases.
-     */
-    public function test_the_floor_includes_the_october_2026_security_releases(): void
+    public function test_the_floor_includes_the_november_2026_security_releases(): void
     {
-        self::assertSame('8.2.35', PhpSecurityFloor::MINIMUM_PATCHED['8.2']);
-        self::assertSame('8.3.36', PhpSecurityFloor::MINIMUM_PATCHED['8.3']);
-        self::assertSame('8.4.27', PhpSecurityFloor::MINIMUM_PATCHED['8.4']);
-        self::assertSame('8.5.12', PhpSecurityFloor::MINIMUM_PATCHED['8.5']);
+        self::assertSame('8.2.36', PhpSecurityFloor::MINIMUM_PATCHED['8.2']);
+        self::assertSame('8.3.37', PhpSecurityFloor::MINIMUM_PATCHED['8.3']);
+        self::assertSame('8.4.28', PhpSecurityFloor::MINIMUM_PATCHED['8.4']);
+        self::assertSame('8.5.13', PhpSecurityFloor::MINIMUM_PATCHED['8.5']);
+        self::assertSame('8.6.0', PhpSecurityFloor::MINIMUM_PATCHED['8.6']);
     }
 
     /**
@@ -47,10 +45,10 @@ final class PhpSecurityFloorTest extends TestCase
     {
         yield 'a supported branch' => ['8.4'];
         yield 'the oldest supported branch' => ['8.2'];
-        yield 'an exactly patched release' => ['8.4.27'];
+        yield 'an exactly patched release' => ['8.4.28'];
         yield 'a newer patch release' => ['8.3.40'];
         yield 'a branch newer than any listed' => ['9.0'];
-        yield 'a patched release candidate' => ['8.6.0RC4'];
+        yield 'the first stable PHP 8.6 release' => ['8.6.0'];
         yield 'something that is not a version' => ['latest'];
     }
 
@@ -67,9 +65,11 @@ final class PhpSecurityFloorTest extends TestCase
     {
         yield 'an end-of-life branch' => ['8.1', 'past end of life'];
         yield 'an end-of-life patch release' => ['7.4.33', 'past end of life'];
-        yield 'a vulnerable 8.4 patch release' => ['8.4.26', 'Use 8.4.27 or newer'];
-        yield 'a vulnerable 8.5 patch release' => ['8.5.0', 'Use 8.5.12 or newer'];
-        yield 'an unpatched release candidate' => ['8.6.0RC3', 'Use 8.6.0RC4 or newer'];
+        yield 'the previous 8.2 floor' => ['8.2.35', 'Use 8.2.36 or newer'];
+        yield 'the previous 8.3 floor' => ['8.3.36', 'Use 8.3.37 or newer'];
+        yield 'the previous 8.4 floor' => ['8.4.27', 'Use 8.4.28 or newer'];
+        yield 'the previous 8.5 floor' => ['8.5.12', 'Use 8.5.13 or newer'];
+        yield 'a release candidate' => ['8.6.0RC7', 'Use 8.6.0 or newer'];
     }
 
     #[DataProvider('rejectedVersions')]
@@ -83,10 +83,10 @@ final class PhpSecurityFloorTest extends TestCase
      */
     public static function imageVersionsTheDockerfileAccepts(): iterable
     {
-        yield 'an exactly patched release' => ['8.4.27'];
-        yield 'a newer patch release' => ['8.2.36'];
-        yield 'the patched 8.5 release' => ['8.5.12'];
-        yield 'a patched release candidate' => ['8.6.0RC4'];
+        yield 'an exactly patched release' => ['8.4.28'];
+        yield 'a newer patch release' => ['8.2.37'];
+        yield 'the patched 8.5 release' => ['8.5.13'];
+        yield 'the first stable PHP 8.6 release' => ['8.6.0'];
         yield 'a branch newer than any listed' => ['8.10.0'];
     }
 
@@ -103,9 +103,9 @@ final class PhpSecurityFloorTest extends TestCase
      */
     public static function imageVersionsTheDockerfileRejects(): iterable
     {
-        yield 'a stale cached 8.4 image' => ['8.4.26', 'fixed in 8.4.27'];
-        yield 'a stale cached 8.3 image' => ['8.3.1', 'fixed in 8.3.36'];
-        yield 'an unpatched release candidate' => ['8.6.0RC3', 'fixed in 8.6.0RC4'];
+        yield 'a stale cached 8.4 image' => ['8.4.27', 'fixed in 8.4.28'];
+        yield 'a stale cached 8.3 image' => ['8.3.36', 'fixed in 8.3.37'];
+        yield 'a release candidate' => ['8.6.0RC7', 'fixed in 8.6.0'];
         yield 'an end-of-life branch' => ['8.1.34', 'past end of life'];
     }
 

@@ -10,6 +10,7 @@ use Ship\Contracts\NeedsAppUrl;
 use Ship\Contracts\RequiresPhpExtensions;
 use Ship\Contracts\ShipEnvironment;
 use Ship\Node\PackageManager;
+use Ship\Services\OctaneSwooleService;
 use Ship\Services\ServiceRegistry;
 use Ship\Services\SupportsNamedInstances;
 use Ship\Support\PhpSecurityFloor;
@@ -59,7 +60,7 @@ final class ComposeFileBuilder
         $this->assertNoServiceNameCollisions($config->services, $serviceNames);
         $this->assertUniqueAdditionalServiceNames($config->additionalServices);
         $this->assertAdditionalServicesSupportNamedInstances($config->additionalServices);
-        $this->assertPhpVersionIsPatched($config->phpVersion);
+        $this->assertPhpVersionIsSupported($config);
 
         $compose = [
             ...($projectName !== null ? ['name' => $projectName] : []),
@@ -743,12 +744,12 @@ final class ComposeFileBuilder
     }
 
     /**
-     * Fails before a long Docker build that the Dockerfile's PHP_SECURITY_FLOOR check would only
-     * reject at the end of the base stage anyway.
+     * Fail before Docker runs if the chosen PHP version is insecure or incompatible.
      */
-    private function assertPhpVersionIsPatched(string $phpVersion): void
+    private function assertPhpVersionIsSupported(ShipConfig $config): void
     {
-        $problem = PhpSecurityFloor::problemWith($phpVersion);
+        $problem = PhpSecurityFloor::problemWith($config->phpVersion)
+            ?? OctaneSwooleService::phpVersionProblem($config->phpVersion, $config->services['runtime'] ?? null);
 
         if ($problem !== null) {
             throw new \InvalidArgumentException("ship.json \"php\": {$problem}");
@@ -851,7 +852,7 @@ final class ComposeFileBuilder
     private function runtimeBuildArg(?string $runtime): string
     {
         return match ($runtime) {
-            'octane-swoole' => 'swoole',
+            OctaneSwooleService::KEY => 'swoole',
             'octane-roadrunner' => 'roadrunner',
             'octane-frankenphp' => 'frankenphp',
             default => 'fpm',

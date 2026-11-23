@@ -961,4 +961,15 @@ final class ComposeFileBuilderTest extends TestCase
 
         $builder->build($config, ShipEnvironment::Development);
     }
+
+    public function test_it_refuses_php_86_with_swoole_before_any_docker_build(): void
+    {
+        $builder = new ComposeFileBuilder($this->registry());
+        $config = new ShipConfig(phpVersion: '8.6', services: ['runtime' => 'octane-swoole']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Octane (Swoole) supports PHP through 8.5');
+
+        $builder->build($config, ShipEnvironment::Production);
+    }
 }

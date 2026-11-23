@@ -258,7 +258,7 @@ final class ShipConfigTest extends TestCase
 
         $config = ShipConfig::fromFile($this->projectRoot . '/ship.json');
 
-        self::assertSame('8.4', $config->phpVersion);
+        self::assertSame('8.5', $config->phpVersion);
         self::assertSame('24', $config->nodeVersion);
         self::assertSame(['database' => 'postgres'], $config->services);
         self::assertSame([], $config->extensions);

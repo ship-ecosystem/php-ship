@@ -68,6 +68,7 @@ final class InitCommandReadExistingConfigTest extends TestCase
         $existing = $this->invoke();
 
         self::assertNotNull($existing);
+        self::assertSame('8.3', $existing->phpVersion);
         self::assertSame(['app' => 'client-app'], $existing->serviceNames);
         self::assertSame('shared_infra', $existing->externalNetwork);
         self::assertSame(['gd'], $existing->phpExtensions);

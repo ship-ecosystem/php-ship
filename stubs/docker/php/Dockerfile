@@ -1,4 +1,4 @@
-ARG PHP_VERSION=8.4
+ARG PHP_VERSION=8.5
 ARG OCTANE_RUNTIME=fpm
 ARG NODE_VERSION=24
 
@@ -38,19 +38,31 @@ RUN apk add --no-cache libpq-dev icu-dev oniguruma-dev libzip-dev fcgi \
 # above, asks it over FastCGI).
 COPY ship/php-fpm.conf /usr/local/etc/php-fpm.d/zz-ship.conf
 
-# Extra extensions from ship.json's phpExtensions, installed with
-# mlocati/docker-php-extension-installer, which knows each extension's build dependencies. Skipped
-# entirely when the list is empty. The installer is pinned to a release and checksum-verified;
-# bump INSTALL_PHP_EXTENSIONS_VERSION and the checksum together.
-ARG PHP_EXTENSIONS=""
-ARG INSTALL_PHP_EXTENSIONS_VERSION=2.12.0
-ARG INSTALL_PHP_EXTENSIONS_SHA256=3f49c71fa66c79b8b2b96bc0ce92885dafd7946f3b5a46f545b390d6f1617e2c
-RUN if [ -n "$PHP_EXTENSIONS" ]; then \
-        curl -sSLf "https://github.com/mlocati/docker-php-extension-installer/releases/download/${INSTALL_PHP_EXTENSIONS_VERSION}/install-php-extensions" -o /usr/local/bin/install-php-extensions \
-        && echo "${INSTALL_PHP_EXTENSIONS_SHA256}  /usr/local/bin/install-php-extensions" | sha256sum -c - \
-        && chmod +x /usr/local/bin/install-php-extensions \
-        && install-php-extensions $PHP_EXTENSIONS; \
+# The installer handles build dependencies and bootstraps PECL when the base image omits it
+# (PHP 8.6 and later). Bump the installer version and its checksum together.
+ARG INSTALL_PHP_EXTENSIONS_VERSION=2.13.3
+ARG INSTALL_PHP_EXTENSIONS_SHA256=d7ecb2087962a272c1d9806069ff6095cd25bf6553d7452db2007db5fa11875f
+RUN curl -fsSL "https://github.com/mlocati/docker-php-extension-installer/releases/download/${INSTALL_PHP_EXTENSIONS_VERSION}/install-php-extensions" -o /usr/local/bin/install-php-extensions \
+    && echo "${INSTALL_PHP_EXTENSIONS_SHA256}  /usr/local/bin/install-php-extensions" | sha256sum -c - \
+    && chmod +x /usr/local/bin/install-php-extensions
+
+# Laravel uses phpredis by default. Swoole needs a compiled extension, while RoadRunner is a
+# separate binary. Ship picks PHP 8.6-compatible releases when it builds on that branch.
+COPY ship/install-ship-extension.sh /usr/local/share/ship/install-ship-extension.sh
+ARG REDIS_EXTENSION_VERSION=""
+ARG SWOOLE_EXTENSION_VERSION=6.2.6
+RUN sh /usr/local/share/ship/install-ship-extension.sh redis "$REDIS_EXTENSION_VERSION"
+RUN if [ "$OCTANE_RUNTIME" = "swoole" ]; then \
+        apk add --no-cache brotli-libs libstdc++ \
+        && apk add --no-cache --virtual .build-deps-swoole $PHPIZE_DEPS linux-headers brotli-dev openssl-dev \
+        && MAKE="make -j$(nproc)" pecl install "swoole-${SWOOLE_EXTENSION_VERSION}" \
+        && docker-php-ext-enable swoole \
+        && apk del .build-deps-swoole; \
     fi
+
+# Extra extensions from ship.json and Composer.
+ARG PHP_EXTENSIONS=""
+RUN if [ -n "$PHP_EXTENSIONS" ]; then install-php-extensions $PHP_EXTENSIONS; fi
 
 # Copied from the official node image at NODE_VERSION (musl-built, matching this Alpine base),
 # since Alpine's own package only carries one Node version. npm is a JS CLI run through node, so
@@ -75,35 +87,13 @@ RUN npm install --global --no-fund --no-audit "corepack@${COREPACK_VERSION}" \
     && corepack enable yarn pnpm \
     && mkdir -p "$COREPACK_HOME" && chmod 1777 "$COREPACK_HOME"
 
-# phpredis is installed unconditionally: selecting Redis sets CACHE_STORE/SESSION_DRIVER=redis,
-# and Laravel's default REDIS_CLIENT is "phpredis". Pinned to an exact PECL release; bump
-# REDIS_EXTENSION_VERSION deliberately.
-ARG REDIS_EXTENSION_VERSION=6.3.0
-RUN apk add --no-cache --virtual .build-deps-redis $PHPIZE_DEPS \
-    && pecl install redis-$REDIS_EXTENSION_VERSION \
-    && docker-php-ext-enable redis \
-    && apk del .build-deps-redis
-
-# Swoole needs a compiled extension. RoadRunner is a Go binary pulled in via Composer and needs
-# nothing here; FrankenPHP has its own Dockerfile. brotli-dev is required by Swoole's configure
-# step. Pinned like REDIS_EXTENSION_VERSION.
-ARG SWOOLE_EXTENSION_VERSION=6.2.3
-RUN if [ "$OCTANE_RUNTIME" = "swoole" ]; then \
-        apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers brotli-dev \
-        && pecl install swoole-$SWOOLE_EXTENSION_VERSION \
-        && docker-php-ext-enable swoole \
-        && apk del .build-deps; \
-    fi
-
 WORKDIR /var/www/html
 
 # ---- dev -------------------------------------------------------------
 FROM base AS dev
-# Pinned like REDIS_EXTENSION_VERSION.
-ARG XDEBUG_EXTENSION_VERSION=3.5.3
+ARG XDEBUG_EXTENSION_VERSION=""
 RUN apk add --no-cache linux-headers $PHPIZE_DEPS \
-    && pecl install xdebug-$XDEBUG_EXTENSION_VERSION \
-    && docker-php-ext-enable xdebug
+    && sh /usr/local/share/ship/install-ship-extension.sh xdebug "$XDEBUG_EXTENSION_VERSION"
 COPY ship/dev/php.ini /usr/local/etc/php/conf.d/99-ship-dev.ini
 COPY --from=composer:2.10.3 /usr/bin/composer /usr/bin/composer
 COPY ship/dev/entrypoint.sh /usr/local/bin/ship-entrypoint
@@ -170,11 +160,11 @@ CMD ["php-fpm"]
 # otherwise. prod-nginx keeps nginx's default user.
 #
 # Pinned to an exact nginx stable release; bump deliberately.
-FROM nginx:1.30.5-alpine AS dev-nginx
+FROM nginx:1.30.7-alpine AS dev-nginx
 COPY ship/nginx/default.conf /etc/nginx/conf.d/default.conf
 RUN sed -i 's/^user  *nginx;/user root;/' /etc/nginx/nginx.conf
 
-FROM nginx:1.30.5-alpine AS prod-nginx
+FROM nginx:1.30.7-alpine AS prod-nginx
 COPY --from=assets /var/www/html/public /var/www/html/public
 COPY ship/nginx/default.conf /etc/nginx/conf.d/default.conf
 

@@ -11,9 +11,19 @@ use Ship\Docker\Healthchecks;
 
 final class OctaneSwooleService implements ServiceDefinition
 {
+    public const KEY = 'octane-swoole';
+
     public function key(): string
     {
-        return 'octane-swoole';
+        return self::KEY;
+    }
+
+    public static function phpVersionProblem(string $phpVersion, ?string $runtime): ?string
+    {
+        // The pinned Swoole version declares a maximum PHP version of 8.5.99.
+        return $runtime === self::KEY && version_compare($phpVersion, '8.6', '>=')
+            ? 'Octane (Swoole) supports PHP through 8.5. Choose PHP 8.5 or a different runtime.'
+            : null;
     }
 
     public function label(): string

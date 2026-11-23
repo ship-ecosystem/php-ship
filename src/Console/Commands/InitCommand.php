@@ -14,6 +14,7 @@ use Ship\Docker\ProjectEnv;
 use Ship\Frameworks\Frameworks;
 use Ship\Node\PackageManager;
 use Ship\Node\PackageManagerVersions;
+use Ship\Services\OctaneSwooleService;
 use Ship\Services\ServiceRegistry;
 use Ship\Support\PhpSecurityFloor;
 use Ship\Support\ShipVersion;
@@ -103,7 +104,7 @@ final class InitCommand extends Command
         }
 
         $minimumPhp = Frameworks::minimumPhp($this->projectRoot, $this->extensionFrameworkAdapters);
-        $defaultPhp = $existing->phpVersion ?? '8.4';
+        $defaultPhp = $existing->phpVersion ?? ShipConfig::DEFAULT_PHP_VERSION;
         if ($minimumPhp !== null && version_compare($defaultPhp, $minimumPhp['version'], '<')) {
             $defaultPhp = $minimumPhp['version'];
         }
@@ -234,9 +235,10 @@ final class InitCommand extends Command
                     default: is_string($previous) ? $previous : $defaultPhp,
                     hint: $minimumPhp !== null
                         ? "{$minimumPhp['framework']} needs {$minimumPhp['version']} or newer"
-                        : 'A supported branch, such as 8.4, or an exact release',
-                    validate: fn (string $answer): ?string => (preg_match(ShipConfig::PHP_VERSION_PATTERN, trim($answer)) === 1 ? null : 'Use a PHP version such as 8.4 or 8.4.12.')
+                        : 'A supported branch, such as 8.5 or 8.6, or an exact release',
+                    validate: fn (string $answer): ?string => (preg_match(ShipConfig::PHP_VERSION_PATTERN, trim($answer)) === 1 ? null : 'Use a PHP version such as 8.5 or 8.5.13.')
                         ?? PhpSecurityFloor::problemWith(trim($answer))
+                        ?? OctaneSwooleService::phpVersionProblem(trim($answer), self::selectedServices($answers)['runtime'] ?? null)
                         ?? Frameworks::phpVersionProblem($this->projectRoot, $answer, $this->extensionFrameworkAdapters),
                 ),
                 name: 'php',

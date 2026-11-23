@@ -21,19 +21,19 @@ final class PhpSecurityFloor
     /**
      * Branch => first patched release.
      *
-     * Current floor: CVE-2026-109618 (GHSA-w8hw-w9fx-j79w, RCE via OOM corruption) and
-     * CVE-2026-109619 (GHSA-6wmf-4rv5-p3rp, RCE via stale global state), fixed 2026-10-21.
+     * The November 19, 2026 security releases, including fixes for CVE-2026-129289
+     * (FastCGI request smuggling) and CVE-2026-126714 (corrupted session files).
      */
     public const MINIMUM_PATCHED = [
-        '8.2' => '8.2.35',
-        '8.3' => '8.3.36',
-        '8.4' => '8.4.27',
-        '8.5' => '8.5.12',
-        '8.6' => '8.6.0RC4',
+        '8.2' => '8.2.36',
+        '8.3' => '8.3.37',
+        '8.4' => '8.4.28',
+        '8.5' => '8.5.13',
+        '8.6' => '8.6.0',
     ];
 
     /**
-     * Space-separated, for a Docker build arg: "8.2.35 8.3.36 ...".
+     * Space-separated minimum versions for the Docker build argument.
      */
     public static function buildArg(): string
     {
