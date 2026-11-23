@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Ship\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Ship\Config\ShipConfig;
 use Ship\Contracts\NeedsAppUrl;
+use Ship\Contracts\ShipEnvironment;
+use Ship\Docker\ComposeFileBuilder;
 use Ship\Services\ServiceRegistry;
+use Symfony\Component\Yaml\Yaml;
 
 final class ServiceEnvironmentContractTest extends TestCase
 {
@@ -24,5 +28,24 @@ final class ServiceEnvironmentContractTest extends TestCase
             }
             self::assertSame([], array_values(array_diff($keys, $variables)), $provider);
         }
+    }
+
+    public function test_database_admin_passwords_do_not_pass_from_the_env_file_to_the_app(): void
+    {
+        $builder = new ComposeFileBuilder(new ServiceRegistry(ServiceRegistry::defaults()));
+        $config = new ShipConfig(
+            phpVersion: '8.5',
+            services: ['database' => 'mysql'],
+            additionalServices: [['group' => 'database', 'service' => 'mongodb', 'name' => 'events']],
+            processes: ['worker' => 'php worker.php'],
+        );
+        $services = Yaml::parse($builder->build($config, ShipEnvironment::Production))['services'];
+
+        foreach (['app', 'worker'] as $name) {
+            self::assertSame('', $services[$name]['environment']['DB_ROOT_PASSWORD']);
+            self::assertSame('', $services[$name]['environment']['EVENTS_MONGODB_ROOT_PASSWORD']);
+        }
+        self::assertStringContainsString('${DB_ROOT_PASSWORD:?', $services['mysql']['environment']['MYSQL_ROOT_PASSWORD']);
+        self::assertStringContainsString('${EVENTS_MONGODB_ROOT_PASSWORD:?', $services['mongodb-events']['environment']['MONGO_INITDB_ROOT_PASSWORD']);
     }
 }

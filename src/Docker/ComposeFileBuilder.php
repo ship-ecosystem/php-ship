@@ -257,6 +257,16 @@ final class ComposeFileBuilder
         }
 
         $env = $service->environmentVariables($instanceName);
+        $adminSetting = match ($key) {
+            'mysql', 'mariadb', 'sqlserver' => 'DB_ROOT_PASSWORD',
+            'mongodb' => 'MONGODB_ROOT_PASSWORD',
+            default => null,
+        };
+        if ($adminSetting !== null) {
+            // The app also loads env_file. Mask the server-only setting so it cannot leak through.
+            $prefix = $instanceName === null ? '' : strtoupper($instanceName) . '_';
+            $env[$prefix . $adminSetting] = '';
+        }
 
         // environmentVariables() embeds the service's unrenamed compose name in some values
         // (DB_HOST, MEILISEARCH_HOST), so those are renamed along with the fragment key.
