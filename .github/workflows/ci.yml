@@ -240,7 +240,11 @@ jobs:
           php "$GITHUB_WORKSPACE/tests/Integration/verify-release.php" dist/ship/ci-test
           php -r '
           $m = json_decode(file_get_contents("dist/ship/ci-test/release.json"), true);
-          exit($m["app"] === "ci-fixture" && count($m["images"]) === 2 && $m["http"][0]["health"] === "/up" ? 0 : 1);
+          $files = array_column($m["images"], "file");
+          sort($files);
+          exit($m["app"] === "ci-fixture"
+              && $files === ["images/app.tar", "images/mysql.tar", "images/webserver.tar"]
+              && $m["http"][0]["health"] === "/up" ? 0 : 1);
           '
 
       - name: The release passes ship-ecosystem/spec's checker
