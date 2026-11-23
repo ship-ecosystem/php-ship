@@ -94,7 +94,8 @@ final class MongoDbServiceTest extends TestCase
         self::assertSame(['ship-mongodb-events-data:/data/db'], $fragment['mongodb-events']['volumes']);
         self::assertSame('${EVENTS_MONGODB_DATABASE:-app}', $fragment['mongodb-events']['environment']['MONGO_INITDB_DATABASE']);
         self::assertStringContainsString('@mongodb-events:27017/', $appEnv['EVENTS_MONGODB_URI']);
-        self::assertSame(['EVENTS_MONGODB_URI', 'EVENTS_MONGODB_DATABASE'], array_keys($appEnv));
+        self::assertSame(['EVENTS_MONGODB_URI', 'EVENTS_MONGODB_DATABASE', 'EVENTS_MONGODB_HOST', 'EVENTS_MONGODB_PORT',
+            'EVENTS_MONGODB_USERNAME', 'EVENTS_MONGODB_PASSWORD'], array_keys($appEnv));
     }
 
     public function test_db_shell_command_authenticates_as_the_app_user(): void

@@ -42,7 +42,12 @@ final class CypressService implements ServiceDefinition, NeedsAppUrl
 
         return [
             'cypress' => [
-                'image' => 'cypress/included:16.3.0',
+                ...ServiceImage::patched(
+                    'cypress/included:16.3.0',
+                    'apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/debian.sources -o Dir::Etc::sourceparts=- update'
+                    . ' && DEBIAN_FRONTEND=noninteractive apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/debian.sources -o Dir::Etc::sourceparts=- upgrade -y'
+                    . ' && rm -rf /var/lib/apt/lists/*'
+                ),
                 // The image's own entrypoint runs the suite once and exits, which the restart
                 // policy would turn into an endless loop; idle instead and run on demand.
                 'entrypoint' => ['sleep', 'infinity'],

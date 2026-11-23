@@ -57,6 +57,8 @@ jobs:
             curl -fsSL "https://raw.githubusercontent.com/ship-ecosystem/spec/main/schemas/$file" -o "/tmp/spec-$file"
             diff -u "/tmp/spec-$file" "schema/$file"
           done
+          curl -fsSL https://raw.githubusercontent.com/ship-ecosystem/spec/main/contracts/service-environment.json -o /tmp/spec-service-environment.json
+          diff -u /tmp/spec-service-environment.json schema/service-environment.json
 
   # Build the actual dev images on every PHP branch and check the PHP 8.6 FrankenPHP path.
   base-image:
@@ -242,7 +244,7 @@ jobs:
           '
 
       - name: The release passes ship-ecosystem/spec's checker
-        uses: ship-ecosystem/spec@db16bbc24e5a3e66c3a8c10ec42a63042859b1dc
+        uses: ship-ecosystem/spec@a201f5f5b6c1fe6cc5834fb6073da275decaf09a
         with:
           path: /tmp/ci-fixture/dist/ship/ci-test
 

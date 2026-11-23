@@ -35,7 +35,7 @@ final class PostgresService implements ServiceDefinition, ProvidesDatabaseShell
 
         return [
             $name => [
-                'image' => 'postgres:18.7-alpine',
+                ...ServiceImage::patched('postgres:18.7-alpine', 'apk upgrade --no-cache'),
                 'environment' => [
                     'POSTGRES_DB' => "\${{$prefix}DB_DATABASE:-app}",
                     'POSTGRES_USER' => "\${{$prefix}DB_USERNAME:-app}",

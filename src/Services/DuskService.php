@@ -17,7 +17,7 @@ final class DuskService implements ServiceDefinition, NeedsAppUrl
 
     public function label(): string
     {
-        return 'Dusk (Selenium/Chrome)';
+        return 'Dusk (Selenium/Chromium)';
     }
 
     public function group(): string
@@ -39,7 +39,7 @@ final class DuskService implements ServiceDefinition, NeedsAppUrl
             'selenium' => [
                 // Pinned to an exact version: a Chrome upgrade can change test behaviour, so
                 // bump it deliberately.
-                'image' => 'selenium/standalone-chrome:4.53.0-20261120',
+                'image' => 'selenium/standalone-chromium:4.53.0-20261120',
                 'shm_size' => '2gb',
             ],
         ];
@@ -50,6 +50,7 @@ final class DuskService implements ServiceDefinition, NeedsAppUrl
         return [
             // APP_URL comes from appUrlVariables().
             'DUSK_DRIVER_URL' => 'http://selenium:4444/wd/hub',
+            'SELENIUM_REMOTE_URL' => 'http://selenium:4444/wd/hub',
         ];
     }
 

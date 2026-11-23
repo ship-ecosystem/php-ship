@@ -38,7 +38,10 @@ final class TypesenseService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'typesense/typesense:30.2',
+                ...ServiceImage::patched(
+                    'typesense/typesense:30.2',
+                    'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && rm -rf /var/lib/apt/lists/*'
+                ),
                 'environment' => [
                     // A default in dev, required in production (see RequiredEnv).
                     'TYPESENSE_API_KEY' => RequiredEnv::expr("{$prefix}TYPESENSE_API_KEY", 'shipsearchkey', $environment),

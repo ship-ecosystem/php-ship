@@ -36,7 +36,7 @@ final class TypesenseServiceTest extends TestCase
     {
         $fragment = (new TypesenseService())->composeFragment(ShipEnvironment::Production)['typesense'];
 
-        self::assertMatchesRegularExpression('/^typesense\/typesense:\d+\.\d+$/', $fragment['image']);
+        self::assertStringStartsWith("FROM typesense/typesense:30.2\n", $fragment['build']['dockerfile_inline']);
         self::assertSame('${TYPESENSE_API_KEY:?set a real value in .env.production}', $fragment['environment']['TYPESENSE_API_KEY']);
         self::assertSame('/data', $fragment['environment']['TYPESENSE_DATA_DIR']);
         self::assertSame(['ship-typesense-data:/data'], $fragment['volumes']);

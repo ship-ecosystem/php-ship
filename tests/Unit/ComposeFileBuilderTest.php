@@ -918,14 +918,15 @@ final class ComposeFileBuilderTest extends TestCase
     public function test_production_builds_always_pull_a_fresh_base_image(): void
     {
         $builder = new ComposeFileBuilder($this->registry());
-        $config = new ShipConfig(phpVersion: '8.4', services: ['database' => 'postgres']);
+        $config = new ShipConfig(phpVersion: '8.4', services: ['database' => 'postgres', 'cache' => 'redis']);
 
         $parsed = Yaml::parse($builder->build($config, ShipEnvironment::Production));
 
         self::assertTrue($parsed['services']['app']['build']['pull']);
         self::assertTrue($parsed['services']['webserver']['build']['pull']);
+        self::assertTrue($parsed['services']['postgres']['build']['pull']);
         // An image-only service has nothing to build.
-        self::assertArrayNotHasKey('build', $parsed['services']['postgres']);
+        self::assertArrayNotHasKey('build', $parsed['services']['redis']);
     }
 
     /**

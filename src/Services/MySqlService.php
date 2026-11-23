@@ -35,7 +35,7 @@ final class MySqlService implements ServiceDefinition, ProvidesDatabaseShell
 
         return [
             $name => [
-                'image' => 'mysql:9.7.4',
+                ...ServiceImage::patched('mysql:9.7.4', "microdnf --disablerepo='mysql*' -y upgrade && microdnf clean all"),
                 'environment' => [
                     'MYSQL_DATABASE' => "\${{$prefix}DB_DATABASE:-app}",
                     'MYSQL_USER' => "\${{$prefix}DB_USERNAME:-app}",

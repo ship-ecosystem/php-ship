@@ -303,10 +303,11 @@ final class ReleaseWriterTest extends TestCase
         $compose = Yaml::parseFile($release['destination'] . '/docker-compose.yml');
 
         self::assertSame([
-            ['ref' => 'postgres:18.7-alpine@sha256:' . FakeReleaseDocker::digestFor('postgres:18.7-alpine'), 'services' => ['postgres']],
             ['ref' => 'redis:8.10.3-alpine3.23@sha256:' . FakeReleaseDocker::digestFor('redis:8.10.3-alpine3.23'), 'services' => ['redis']],
         ], $release['manifest']['pulledImages']);
-        self::assertSame($release['manifest']['pulledImages'][0]['ref'], $compose['services']['postgres']['image']);
+        self::assertSame($release['manifest']['pulledImages'][0]['ref'], $compose['services']['redis']['image']);
+        self::assertContains($compose['services']['postgres']['image'], array_column($release['manifest']['images'], 'ref'));
+        self::assertArrayNotHasKey('build', $compose['services']['postgres']);
         self::assertArrayNotHasKey('build', $compose['services']['app']);
     }
 
@@ -499,7 +500,7 @@ final class ReleaseWriterTest extends TestCase
 
         self::assertStringContainsString(
             "docker network create proxy  # only if it does not exist yet\ndocker load -i images/app.tar\n"
-                . "docker load -i images/webserver.tar\nsh deploy-commands.sh\ndocker compose up -d\n",
+                . "docker load -i images/webserver.tar\ndocker load -i images/postgres.tar\nsh deploy-commands.sh\ndocker compose up -d\n",
             $readme,
         );
         self::assertStringContainsString('production secrets', $readme);

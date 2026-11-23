@@ -16,7 +16,7 @@ final class ValkeyServiceTest extends TestCase
     public function test_the_app_uses_its_redis_driver_against_valkey(): void
     {
         self::assertSame(
-            ['CACHE_STORE' => 'redis', 'SESSION_DRIVER' => 'redis', 'REDIS_HOST' => 'valkey', 'REDIS_PORT' => '6379'],
+            ['CACHE_STORE' => 'redis', 'SESSION_DRIVER' => 'redis', 'REDIS_HOST' => 'valkey', 'REDIS_PORT' => '6379', 'REDIS_URL' => 'redis://valkey:6379/0'],
             (new ValkeyService())->environmentVariables(),
         );
     }
@@ -39,6 +39,6 @@ final class ValkeyServiceTest extends TestCase
         $service = new ValkeyService();
 
         self::assertArrayHasKey('valkey-queue', $service->composeFragment(ShipEnvironment::Development, 'queue'));
-        self::assertSame(['QUEUE_REDIS_HOST' => 'valkey-queue', 'QUEUE_REDIS_PORT' => '6379'], $service->environmentVariables('queue'));
+        self::assertSame(['QUEUE_REDIS_HOST' => 'valkey-queue', 'QUEUE_REDIS_PORT' => '6379', 'QUEUE_REDIS_URL' => 'redis://valkey-queue:6379/0'], $service->environmentVariables('queue'));
     }
 }

@@ -1013,8 +1013,9 @@ The Dockerfile check is part of the published `ship/Dockerfile`, which only
 the installed ship. The floor lives in `Ship\Support\PhpSecurityFloor`,
 raised whenever php.net ships a security release.
 
-The bundled nginx image is pinned to `1.30.7-alpine` in development and
-production, which includes the [November 18 HTTP/2 security fixes](https://nginx.org/2026.html).
+The bundled nginx image installs signed nginx `1.30.8` and matching modules
+in development and production. This covers the
+[November HTTP/2 and TLS security fixes](https://nginx.org/en/security_advisories.html).
 The bundled listener uses HTTP/1.1. For an existing project, refresh its
 published stubs with `ship init` or update the nginx pin in its custom
 Dockerfile, then rebuild. For production, deploy a new release so the

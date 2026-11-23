@@ -105,6 +105,10 @@ final class MongoDbService implements ServiceDefinition, ProvidesDatabaseShell, 
             "{$prefix}MONGODB_URI" => "mongodb://\${{$prefix}MONGODB_USERNAME:-app}:\${{$prefix}MONGODB_PASSWORD:-secret}"
                 . "@{$name}:27017/\${{$prefix}MONGODB_DATABASE:-app}",
             "{$prefix}MONGODB_DATABASE" => "\${{$prefix}MONGODB_DATABASE:-app}",
+            "{$prefix}MONGODB_HOST" => $name,
+            "{$prefix}MONGODB_PORT" => '27017',
+            "{$prefix}MONGODB_USERNAME" => "\${{$prefix}MONGODB_USERNAME:-app}",
+            "{$prefix}MONGODB_PASSWORD" => "\${{$prefix}MONGODB_PASSWORD:-secret}",
         ];
     }
 

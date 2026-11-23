@@ -23,7 +23,7 @@ final class CypressServiceTest extends TestCase
     {
         $fragment = (new CypressService())->composeFragment(ShipEnvironment::Development)['cypress'];
 
-        self::assertMatchesRegularExpression('/^cypress\/included:\d+\.\d+\.\d+$/', $fragment['image']);
+        self::assertStringStartsWith("FROM cypress/included:16.3.0\n", $fragment['build']['dockerfile_inline']);
         self::assertSame(['sleep', 'infinity'], $fragment['entrypoint']);
         self::assertTrue($fragment['init']);
         self::assertSame('/e2e', $fragment['working_dir']);

@@ -26,7 +26,8 @@ RUN SHIP_BASE_IMAGE="php:${PHP_VERSION}-fpm-alpine" php /usr/local/share/ship/ch
 # OPcache is only built when PHP doesn't already have it. The official images ship it enabled on
 # PHP < 8.5, and from 8.5 it is compiled into PHP itself, so there is no shared module to build:
 # `docker-php-ext-install opcache` fails there with "cp: can't stat 'modules/*'".
-RUN apk add --no-cache libpq-dev icu-dev oniguruma-dev libzip-dev fcgi \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache libpq-dev icu-dev oniguruma-dev libzip-dev fcgi \
     && apk add --no-cache --virtual .build-deps-headers linux-headers \
     && docker-php-ext-install pdo_pgsql pdo_mysql intl mbstring pcntl zip sockets \
     && if ! php -r 'exit(extension_loaded("Zend OPcache") ? 0 : 1);'; then \
@@ -159,12 +160,19 @@ CMD ["php-fpm"]
 # (or synced by Mutagen) from the host, and nginx's unprivileged workers couldn't read it
 # otherwise. prod-nginx keeps nginx's default user.
 #
-# Pinned to an exact nginx stable release; bump deliberately.
-FROM nginx:1.30.7-alpine AS dev-nginx
+# The signed nginx Alpine repository publishes stable security packages
+# before the corresponding multi-platform Docker image is available.
+FROM nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3 AS nginx-base
+RUN apk upgrade --no-cache \
+    && apk add --no-cache --repository https://nginx.org/packages/alpine/v3.24/main \
+        nginx=1.30.8-r1 nginx-module-acme=1.30.8.0.4.2-r1 nginx-module-geoip=1.30.8-r1 \
+        nginx-module-image-filter=1.30.8-r1 nginx-module-njs=1.30.8.1.0.2-r1 nginx-module-xslt=1.30.8-r1
+
+FROM nginx-base AS dev-nginx
 COPY ship/nginx/default.conf /etc/nginx/conf.d/default.conf
 RUN sed -i 's/^user  *nginx;/user root;/' /etc/nginx/nginx.conf
 
-FROM nginx:1.30.7-alpine AS prod-nginx
+FROM nginx-base AS prod-nginx
 COPY --from=assets /var/www/html/public /var/www/html/public
 COPY ship/nginx/default.conf /etc/nginx/conf.d/default.conf
 

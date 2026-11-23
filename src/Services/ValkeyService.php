@@ -62,6 +62,7 @@ final class ValkeyService implements ServiceDefinition
             ...($instanceName === null ? ['CACHE_STORE' => 'redis', 'SESSION_DRIVER' => 'redis'] : []),
             "{$prefix}REDIS_HOST" => $name,
             "{$prefix}REDIS_PORT" => '6379',
+            "{$prefix}REDIS_URL" => "redis://{$name}:6379/0",
         ];
     }
 
