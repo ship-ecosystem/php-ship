@@ -11,11 +11,20 @@ final class ServiceImage
      *
      * @return array{build: array{context: string, dockerfile_inline: string}}
      */
-    public static function patched(string $base, string $upgrade): array
+    public static function patched(string $base, string $upgrade, ?string $runtimeUser = null): array
     {
+        $dockerfile = "FROM {$base}\n";
+        if ($runtimeUser !== null) {
+            $dockerfile .= "USER root\n";
+        }
+        $dockerfile .= "RUN {$upgrade}\n";
+        if ($runtimeUser !== null) {
+            $dockerfile .= "USER {$runtimeUser}\n";
+        }
+
         return ['build' => [
             'context' => '.',
-            'dockerfile_inline' => "FROM {$base}\nRUN {$upgrade}\n",
+            'dockerfile_inline' => $dockerfile,
         ]];
     }
 }
