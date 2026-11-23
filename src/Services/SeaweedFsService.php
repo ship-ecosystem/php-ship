@@ -42,7 +42,7 @@ final class SeaweedFsService implements ServiceDefinition
 
         return [
             $name => [
-                'image' => 'chrislusf/seaweedfs:4.47',
+                ...ServiceImage::patched('ghcr.io/chrislusf/seaweedfs:4.47', 'apk upgrade --no-cache'),
                 // Replaces the image's ENTRYPOINT (the `weed` binary) so the identity file can be
                 // generated at boot.
                 'entrypoint' => ['/bin/sh', '-c'],
