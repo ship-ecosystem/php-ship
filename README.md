@@ -9,13 +9,10 @@ A framework-agnostic, cross-platform Docker development environment for
 PHP — inspired by Laravel Sail, but usable outside Laravel and without
 requiring Windows users to put their project inside WSL.
 
-**Status: production-ready.** `init`/`up`/`down`/`exec`/`shell`/`logs`/
-`db`/`composer`/`npm`/`yarn`/`pnpm`/`package-manager`/`artisan`/`console`/`tempest` all work end-to-end, verified
-against a real Docker daemon in both dev and production mode — including
-a real production HTTP request, a real database, and a real crashed-
-container recovery. CI passes on every push, across Ubuntu/macOS/Windows
-x PHP 8.2 to 8.6, plus a separate job that runs the same dev/production
-verification against a real Docker daemon on every commit.
+Ship generates a local Compose stack and exports portable production releases.
+Use the `ship` CLI to manage containers, connect to services, and run application
+commands inside the stack. CI covers the CLI on Linux, macOS, and Windows and
+exercises development stacks and portable releases with Docker.
 
 ## Contents
 
@@ -108,8 +105,7 @@ tag silently, and refuse to build without the credentials production needs.
   and Elasticsearch always require authentication.
 - Sail still offers PHP 8.0 and 8.1, which no longer get security fixes.
   ship refuses end-of-life branches and any patch release below its PHP
-  security floor (currently the October 2026 RCE fixes), checked again
-  inside the image at build time.
+  security floor. It checks the runtime again inside the image at build time.
 - Production credentials are required, not defaulted: a release can't
   start with a password everyone's development setup shares.
 
@@ -974,10 +970,9 @@ same one with a flag flipped:
 
 ### PHP security floor
 
-The minimum PHP versions come from the [November 19, 2026 security
-releases](https://www.php.net/ChangeLog-8.php#8.5.13). They include fixes for
-[FastCGI request smuggling](https://github.com/php/php-src/security/advisories/GHSA-qc49-hpvq-g2w6)
-and [corrupted session files](https://github.com/php/php-src/security/advisories/GHSA-fm2m-fjf5-v3cp).
+Ship enforces the following minimum PHP versions. See the
+[PHP security advisories](https://github.com/php/php-src/security/advisories)
+for affected versions and upstream fixes.
 
 | Branch | Oldest release ship builds on |
 | --- | --- |
@@ -1013,13 +1008,11 @@ The Dockerfile check is part of the published `ship/Dockerfile`, which only
 the installed ship. The floor lives in `Ship\Support\PhpSecurityFloor`,
 raised whenever php.net ships a security release.
 
-The bundled nginx image installs signed nginx `1.30.8` and matching modules
-in development and production. This covers the
-[November HTTP/2 and TLS security fixes](https://nginx.org/en/security_advisories.html).
-The bundled listener uses HTTP/1.1. For an existing project, refresh its
-published stubs with `ship init` or update the nginx pin in its custom
-Dockerfile, then rebuild. For production, deploy a new release so the
-running PHP and nginx containers use the updated images.
+The bundled image installs signed nginx `1.30.8` and matching modules in
+development and production. The bundled listener uses HTTP/1.1. For an existing
+project, refresh its published stubs with `ship init` or update the nginx pin
+in its custom Dockerfile, then rebuild. Deploy a new production release to
+update the running PHP and nginx containers.
 
 ### `.env.production`
 
