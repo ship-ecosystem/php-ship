@@ -12,8 +12,9 @@ a runtime — is a class implementing `Ship\Contracts\ServiceDefinition`.
    - `group()` — which single-select group it belongs to (`database`,
      `cache`, `runtime`, `storage`, `search`, `mail`, `testing`,
      `frontend`, `broadcasting`, `broker` — or a new group name if it
-     doesn't fit any of these; a new group also needs an entry in
-     `InitCommand::groups()` for `ship init` to prompt for it)
+     doesn't fit any of these). Add an entry in `InitCommand::groups()` to
+     show a new group in the primary service picker. Providers that support
+     named instances can appear in the named-instance picker in any group.
    - `composeFragment(ShipEnvironment $environment, ?string $instanceName = null)`
      — the Docker Compose service(s) this contributes, keyed by service
      name. `$instanceName` is only non-null for an additional named

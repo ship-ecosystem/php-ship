@@ -176,10 +176,11 @@ vendor/bin/ship down
 
 - the project's **name**, which names its containers, images and data
   volumes (a release needs it; keep it once deployed);
-- which **kinds of service** it needs (a checklist), then which service for
-  each (each menu ends with None, for a kind you ticked and then decided
-  against, such as an Octane runtime when PHP-FPM will do), and any second
-  instances (a second database, say);
+- which **kinds of service** it needs, then which service to use for each
+  selected kind. Each provider menu includes **None**. You can add
+  [named service instances](#multiple-instances-of-a-service) for providers
+  that support them. If you select no services, choose
+  **Use only the app** to continue or **Choose services** to reopen the picker.
 - which **processes** run beside the app in production: a checklist of what
   the framework suggests from what the project uses (Horizon or a queue
   worker and the scheduler for Laravel, plus Reverb when `laravel/reverb` is
@@ -188,6 +189,8 @@ vendor/bin/ship down
   and Scheduler's schedules for Symfony; the scheduler and the async command
   worker for Tempest), then processes of your own: a name, a command, and an
   optional health check command (see [`processes`](#configuration-shipjson));
+- the [**Compose service names**](#custom-service-names-and-an-external-network)
+  for the app and selected services. Press Enter to keep the current name.
 - which **PHP extensions** the image needs beyond what's added anyway: it
   first says what that is and why (what every image has, what your
   Composer packages declare, what the chosen services need), then takes the
@@ -597,8 +600,8 @@ plain, readable JSON document:
   means "none selected". A service's key is also its compose service name
   and names its data volume: `postgres` runs as the `postgres` service with
   the `ship-postgres-data` volume.
-- `additionalServices` — extra, named instances beyond the one in
-  `services` (a second database, a second Redis, ...). See
+- `additionalServices` — named instances of supported services, with or without
+  a primary selection in the same group. See
   [Multiple instances of a service](#multiple-instances-of-a-service)
   below.
 - `extensions` — fully-qualified class names of third-party
