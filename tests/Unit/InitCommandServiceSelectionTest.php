@@ -169,9 +169,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'Object storage', 'SeaweedFS (S3-compatible storage)',
             'yes', 'Object storage', 'Garage (S3-compatible storage, lightweight alt.)', 'archive', 'no',
             'no', // no processes of our own
+            '', '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -221,9 +221,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'yes', 'Database', 'MySQL', 'analytics', 'no',
             // PHP / Node versions.
             'no', // no processes of our own
+            '', '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -245,9 +245,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'yes', 'Cache', 'Redis', 'analytics', 'queue',
             'no',
             'no', // no processes of our own
+            '', '', '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -285,9 +285,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'yes', 'Database', 'MySQL', $invalidName, 'analytics',
             'no',
             'no', // no processes of our own
+            '', '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -396,9 +396,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no',
             'Distroless (runs on older CPUs too; no shell in the container)',
             'no', // no processes of our own
+            '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -419,9 +419,9 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no',
             '',
             'no', // no processes of our own
+            '', '', '', // default Compose service names
             '', // no other PHP extensions
             '', // no external networks
-            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -439,7 +439,7 @@ final class InitCommandServiceSelectionTest extends TestCase
 
         $command = new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults()));
         $tester = new CommandTester($command);
-        $tester->setInputs(['', '', '', 'no', '', 'no', '', '', '', '8.4', '24']);
+        $tester->setInputs(['', '', '', 'no', '', 'no', '', '', '', '', '', '8.4', '24']);
         $tester->execute([]);
 
         self::assertSame('distroless', $this->shipJson()['siloImage']);
@@ -490,20 +490,36 @@ final class InitCommandServiceSelectionTest extends TestCase
         $registry = new ServiceRegistry(ServiceRegistry::defaults());
         $tester = new CommandTester(new InitCommand($this->projectRoot, $registry));
         $tester->setInputs([
-            'billing', 'Cache', 'Redis', 'no', 'no', '', 'proxy',
-            'app=redis', 'app=billing-app, webserver=billing-web, redis=billing-cache', '8.4', '24',
+            'billing', 'Cache', 'Redis', 'no', 'no',
+            'redis', 'billing-app', 'billing-web', 'billing-cache', '', 'proxy', '8.4', '24',
         ]);
         self::assertSame(0, $tester->execute([]));
-        self::assertStringContainsString('must be unique', $tester->getDisplay());
-        self::assertStringContainsString('app=billing-app', $tester->getDisplay());
+        self::assertStringContainsString('The name "redis" is already used', $tester->getDisplay());
+        self::assertStringContainsString('Nginx service name [webserver]', $tester->getDisplay());
+        self::assertStringContainsString('Compose service name for redis [redis]', $tester->getDisplay());
         self::assertSame(['app' => 'billing-app', 'webserver' => 'billing-web', 'redis' => 'billing-cache'], $this->shipJson()['serviceNames']);
         self::assertStringContainsString('billing-app:9000', (string) file_get_contents($this->projectRoot . '/ship/nginx/default.conf'));
 
         $rerun = new CommandTester(new InitCommand($this->projectRoot, $registry));
-        $rerun->setInputs(['', '', '', 'no', 'no', '', '', 'app=app', '8.4', '24']);
+        $rerun->setInputs(['', '', '', 'no', 'no', 'app', '', '', '', '', '8.4', '24']);
         self::assertSame(0, $rerun->execute([]));
         self::assertSame(['webserver' => 'billing-web', 'redis' => 'billing-cache'], $this->shipJson()['serviceNames']);
         self::assertMatchesRegularExpression('/(?<![a-z0-9_-])app:9000/', (string) file_get_contents($this->projectRoot . '/ship/nginx/default.conf'));
+    }
+
+    public function test_only_the_app_name_is_prompted_when_no_optional_services_are_selected(): void
+    {
+        $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
+        $tester->setInputs(['billing', 'None', 'no', 'no', '', '', 'proxy', '8.4', '24']);
+
+        self::assertSame(0, $tester->execute([]));
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('App service name [app]', $display);
+        self::assertStringContainsString('default "app" if you are unsure', $display);
+        self::assertStringContainsString('"billing-app"', $display);
+        self::assertStringNotContainsString('Nginx service name', $display);
+        self::assertStringNotContainsString('Compose service name for', $display);
+        self::assertArrayNotHasKey('serviceNames', $this->shipJson());
     }
 
     public function test_re_running_init_keeps_the_projects_name(): void
@@ -518,7 +534,7 @@ final class InitCommandServiceSelectionTest extends TestCase
     public function test_a_name_the_schema_rejects_is_asked_again(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
-        $tester->setInputs(['My.App', 'my-app', 'None', 'no', 'no', '', '8.4']);
+        $tester->setInputs(['My.App', 'my-app', 'None', 'no', 'no', '', '', '', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('Lowercase letters and digits', $tester->getDisplay());
@@ -532,7 +548,7 @@ final class InitCommandServiceSelectionTest extends TestCase
     public function test_with_no_services_chosen_it_offers_to_add_a_service(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
-        $tester->setInputs(['', 'None', 'yes', 'Database', 'MySQL', 'analytics', 'no', 'no', '', '8.4']);
+        $tester->setInputs(['', 'None', 'yes', 'Database', 'MySQL', 'analytics', 'no', 'no', '', '', '', '', '', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('Add a service?', $tester->getDisplay());

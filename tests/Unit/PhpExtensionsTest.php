@@ -100,10 +100,9 @@ final class PhpExtensionsTest extends TestCase
      */
     public function test_init_says_what_is_added_and_refuses_listing_it_again(): void
     {
-        // Name; MongoDB as the database; no instances, no processes; the extensions (refused
-        // twice); no networks; PHP; Node.
+        // MongoDB with the default service names, then extra extensions with two invalid answers.
         $tester = $this->init(
-            ['', 'Database', 'MongoDB', 'no', 'no', 'bcmath', 'intl', 'GD, apcu', '', '8.4', ''],
+            ['', 'Database', 'MongoDB', 'no', 'no', '', '', '', 'bcmath', 'intl', 'GD, apcu', '', '8.4', ''],
             new ServiceRegistry([new MongoDbService()]),
         );
         $display = (string) preg_replace('/\s*\n\s*!?\s*/', ' ', $tester->getDisplay());
@@ -123,7 +122,7 @@ final class PhpExtensionsTest extends TestCase
         file_put_contents($this->projectRoot . '/ship.json', json_encode(['php' => '8.4', 'services' => [], 'phpExtensions' => ['gd', 'zip', 'bcmath']]));
 
         // Name; no processes; Enter keeps the offered list; no networks; PHP; Node.
-        $tester = $this->init(['', 'no', '', '', '8.4', '']);
+        $tester = $this->init(['', 'no', '', '', '', '8.4', '']);
         $display = (string) preg_replace('/\s*\n\s*!?\s*/', ' ', $tester->getDisplay());
 
         self::assertStringContainsString('Other PHP extensions (optional) [gd]', $display);

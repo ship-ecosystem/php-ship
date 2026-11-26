@@ -56,8 +56,10 @@ final class InitCommandLaravelPromptsTest extends TestCase
             Key::SPACE, Key::ENTER,
             // Database: its first service.
             Key::ENTER,
-            // No additional instances, processes, extra PHP extensions, networks or service renames.
+            // No additional instances or processes. Keep the app, Nginx and database names.
             Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER,
+            // No extra PHP extensions or networks.
+            Key::ENTER, Key::ENTER,
             // PHP: an end-of-life branch is refused in place, then 8.4 is typed.
             ...array_fill(0, 3, Key::BACKSPACE), '7', '.', '4', Key::ENTER,
             ...array_fill(0, 3, Key::BACKSPACE), '8', '.', '4', Key::ENTER,
@@ -111,9 +113,10 @@ final class InitCommandLaravelPromptsTest extends TestCase
             // the third instead.
             Key::CTRL_U,
             Key::DOWN, Key::ENTER,
-            // No additional instances, processes, extra PHP extensions, networks or service renames,
-            // then PHP and Node at their defaults.
-            Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER,
+            // No additional instances or processes. Keep the app, Nginx and database names.
+            Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER,
+            // No extra PHP extensions or networks, then keep the default PHP and Node versions.
+            Key::ENTER, Key::ENTER, Key::ENTER, Key::ENTER,
         ]);
 
         $tester = new CommandTester(new InitCommand(

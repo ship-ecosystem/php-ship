@@ -839,10 +839,14 @@ the same Docker network: Compose gives every container a network alias
 matching its service name, so two projects each running, say, an `app`
 or a `mysql` collide the instant they join that network together.
 
-In `ship init`, use the **Compose service names** prompt after choosing external
-networks. Enter overrides such as `app=client-app, webserver=client-web`.
-Enter keeps current names, `app=app` restores the app default, and `none`
-restores all listed service defaults. The result is saved to `ship.json`:
+After picking services in `ship init`, enter each name at its own prompt.
+At **App service name**, press Enter to keep the current name, typically `app`,
+or type a name such as `client-app` for a shared Docker network. With no optional
+Compose services selected, the app is the only name the wizard asks for.
+For an app-only PHP-FPM project, you can set `serviceNames.webserver` in
+`ship.json` to give Nginx a distinct hostname on a shared network.
+Type the original name, such as `app` or `mysql`, to restore that default.
+Custom names are saved in `ship.json`:
 
 ```json
 {

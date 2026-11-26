@@ -195,6 +195,10 @@ final class InitCommand extends Command
                 ),
                 name: 'processes',
             )
+            ->add(
+                fn (array $answers, mixed $previous): array => $this->promptForServiceNames($ui, $answers, $previous, $existing),
+                name: 'serviceNames',
+            )
             // After the services, since some of them add their own (MongoDB's mongodb, say).
             ->add(
                 fn (array $answers, mixed $previous): array => $this->promptForPhpExtensions(
@@ -226,10 +230,6 @@ final class InitCommand extends Command
                     required: false,
                 )),
                 name: 'externalNetworks',
-            )
-            ->add(
-                fn (array $answers, mixed $previous): array => $this->promptForServiceNames($ui, $answers, $previous, $existing),
-                name: 'serviceNames',
             )
             // Rejects an end-of-life branch or a pinned patch release with known
             // vulnerabilities, or one older than the project's framework needs (Tempest 3: 8.5),
@@ -369,7 +369,8 @@ final class InitCommand extends Command
     private function promptForServiceNames(Ui $ui, array $answers, mixed $previous, ?ShipConfig $existing): array
     {
         $selected = self::selectedServices($answers);
-        $defaults = isset($selected['runtime']) ? ['app'] : ['app', 'webserver'];
+        $hasNginx = !isset($selected['runtime']);
+        $defaults = $hasNginx ? ['app', 'webserver'] : ['app'];
         $productionDefaults = $defaults;
         $additional = ShipConfig::filterAdditionalServices($answers['additionalServices'] ?? ($existing->additionalServices ?? []));
         $instances = [...array_map(static fn (string $key): array => ['service' => $key, 'name' => null], array_values($selected)), ...$additional];
@@ -385,73 +386,45 @@ final class InitCommand extends Command
         $defaults = array_values(array_unique($defaults));
         // The Compose builder also checks its base keys and selected provider identifiers.
         $reserved = array_unique([...$defaults, 'webserver', ...array_values($selected)]);
-        $oldNames = $existing->serviceNames ?? [];
-        $editable = array_fill_keys($defaults, true);
-        $unoffered = array_diff_key($oldNames, $editable);
-        $previous = is_array($previous) ? $previous : $oldNames;
-        $current = [];
-        foreach ($defaults as $key) {
-            if (is_string($previous[$key] ?? null)) {
-                $current[$key] = $previous[$key];
-            }
-        }
-        $currentAnswer = self::formatServiceNames($current);
-        $example = ($answers['externalNetworks'] ?? []) !== [] ? trim((string) $answers['name']) : 'my';
-        $suggestion = "app={$example}-app" . (in_array('webserver', $defaults, true) ? ", webserver={$example}-web" : '');
-        $ui->note('Compose services you can rename: ' . implode(', ', $defaults) . ". Example: {$suggestion}.");
+        $names = is_array($previous) ? $previous : ($existing->serviceNames ?? []);
         $processes = array_keys($answers['processes']['commands'] ?? []);
-        $resolve = static function (string $answer) use ($current, $editable, $unoffered, $reserved, $productionDefaults, $processes): array {
-            $answer = trim($answer);
-            $updates = self::parseServiceNames($answer);
-            if (array_diff_key($updates, $editable) !== []) {
-                throw new \InvalidArgumentException('Use only the listed default Compose service names.');
-            }
-            foreach ($updates as $key => $name) {
-                if ($name !== $key && $name !== ($current[$key] ?? null) && preg_match(ShipConfig::NAME_PATTERN, $name) !== 1) {
-                    throw new \InvalidArgumentException('Use lowercase letters and digits, with words separated by a hyphen or underscore.');
-                }
-            }
-            $names = $answer === 'none' ? $unoffered : $updates + $current + $unoffered;
-            $rename = static fn (string $key): string => $names[$key] ?? $key;
-            $finalNames = array_map($rename, $reserved);
-            $productionNames = [...array_map($rename, array_unique($productionDefaults)), ...$processes];
-            if (count($finalNames) !== count(array_unique($finalNames)) || count($productionNames) !== count(array_unique($productionNames))) {
-                throw new \InvalidArgumentException('Compose service and process names must be unique within the project.');
-            }
+        $example = trim((string) $answers['name']) . '-app';
+        $ui->note('Docker Compose uses the app service name as a hostname. Keep the default "app" if you are unsure. '
+            . "Use a unique name such as \"{$example}\" when sharing a Docker network with other projects.");
 
-            return array_filter($names, static fn (string $name, string $key): bool => $name !== $key, ARRAY_FILTER_USE_BOTH);
-        };
-        $answer = $ui->text(
-            'Compose service names (default=custom, comma-separated; none to reset)',
-            default: $currentAnswer,
-            validate: static function (string $answer) use ($resolve): ?string {
-                try {
-                    $resolve($answer);
-                } catch (\InvalidArgumentException $exception) {
-                    return $exception->getMessage();
-                }
-
-                return null;
-            },
-            required: false,
-        );
-
-        return $resolve(trim($answer) === '' ? $currentAnswer : $answer);
-    }
-
-    /** @return array<string, string> */
-    private static function parseServiceNames(string $answer): array
-    {
-        $names = [];
-        if ($answer === '' || $answer === 'none') {
-            return $names;
-        }
-        foreach (explode(',', $answer) as $entry) {
-            [$key, $name] = array_pad(array_map(trim(...), explode('=', $entry, 2)), 2, '');
-            if ($key === '' || isset($names[$key]) || preg_match('/^[a-z][a-z0-9_-]*$/D', $name) !== 1) {
-                throw new \InvalidArgumentException('Enter each service at most once with a valid lowercase Compose name.');
+        // With no optional Compose services, only ask about the app. Keep any existing Nginx name.
+        $editable = array_diff($defaults, $hasNginx && count($defaults) === 2 ? ['webserver'] : []);
+        foreach ($editable as $key) {
+            $current = is_string($names[$key] ?? null) ? $names[$key] : $key;
+            $taken = array_map(static fn (string $other): string => $names[$other] ?? $other, array_diff($reserved, [$key]));
+            if (in_array($key, $productionDefaults, true)) {
+                array_push($taken, ...$processes);
             }
-            $names[$key] = $name;
+            $label = match ($key) {
+                'app' => 'App service name',
+                'webserver' => 'Nginx service name',
+                default => "Compose service name for {$key}",
+            };
+            $validate = static function (string $answer) use ($key, $current, $taken): ?string {
+                $name = trim($answer);
+                $pattern = $name === $current ? '/^[a-z][a-z0-9_-]*$/D' : ShipConfig::NAME_PATTERN;
+
+                return match (true) {
+                    $name !== $key && preg_match($pattern, $name) !== 1 => 'Use lowercase letters and digits, with words separated by a hyphen or underscore.',
+                    in_array($name, $taken, true) => "The name \"{$name}\" is already used by a service or process in this project.",
+                    default => null,
+                };
+            };
+            $name = trim($ui->text($label, default: $current, validate: $validate, required: false));
+            $name = $name === '' ? $current : $name;
+            if (($problem = $validate($name)) !== null) {
+                throw new \InvalidArgumentException($problem);
+            }
+            if ($name === $key) {
+                unset($names[$key]);
+            } else {
+                $names[$key] = $name;
+            }
         }
 
         return $names;
@@ -631,10 +604,8 @@ final class InitCommand extends Command
     }
 
     /**
-     * Reads the existing ship.json so the fields `ship init` doesn't prompt for (extensions,
-     * serviceNames, externalNetwork, phpExtensions, publishPorts, deployCommands, processes,
-     * hostUser, name) carry over. Uses the lenient ShipConfig::tryFromFile(), so one invalid field
-     * doesn't discard the rest. Null when there is no file or it isn't valid JSON.
+     * Reads the existing ship.json to prefill answers and carry over settings such as extensions
+     * and deploy commands. The lenient reader preserves the other settings if one is invalid.
      */
     private function readExistingConfig(): ?ShipConfig
     {
