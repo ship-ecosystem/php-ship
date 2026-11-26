@@ -767,11 +767,8 @@ into `ship/garage/`, so add that one by re-running `ship init`.
 
 Re-running `ship init` works for every service. It asks about each group
 again, but every prompt defaults to whatever's already selected, so press
-Enter to keep it; existing `additionalServices` entries are kept without
-being asked about at all. Every field it doesn't prompt for
-(`serviceNames`, `externalNetwork`, `phpExtensions`, `publishPorts`,
-`deployCommands`, `processes`, `hostUser`, `name`, `extensions`) carries
-over from the existing `ship.json` unchanged.
+Enter to keep it. Settings such as `publishPorts`, `deployCommands`, `hostUser`
+and `extensions` carry over from the existing `ship.json`.
 
 It also republishes the stub files in `ship/`, **overwriting them**. If
 you edited any by hand (the Dockerfile, the nginx config, the dev
@@ -842,8 +839,10 @@ the same Docker network: Compose gives every container a network alias
 matching its service name, so two projects each running, say, an `app`
 or a `mysql` collide the instant they join that network together.
 
-Not prompted by `ship init` — hand-edit `ship.json` when you actually
-need it:
+In `ship init`, use the **Compose service names** prompt after choosing external
+networks. Enter overrides such as `app=client-app, webserver=client-web`.
+Enter keeps current names, `app=app` restores the app default, and `none`
+restores all listed service defaults. The result is saved to `ship.json`:
 
 ```json
 {
@@ -863,17 +862,14 @@ need it:
   carrying that service's own hostname (`DB_HOST`, `REDIS_HOST`, ...) —
   only the hostname changes; a driver identifier that happens to
   read the same as the old name (`DB_CONNECTION=mysql`) is left alone.
-  Rename as many or as few as you need; anything not listed keeps its
-  default name. Doesn't apply to `additionalServices` entries — those
-  already get their own distinct compose name via their own `name`.
+  Rename as many or as few as you need. Named instances start with a
+  Compose name such as `mysql-analytics` that can also be customized.
   Commands where *you* type the service (`ship exec <service> …`, `ship
   logs <service>`, `ship shell <service>`) take the literal compose name,
   so after renaming `app` to `admin-app` that's `ship exec admin-app …`.
-  Renaming `app` specifically also needs `ship init` re-run afterward (when
-  nginx is in use, i.e. no Octane runtime selected) — the published
-  `ship/nginx/default.conf` bakes the app service's name into its upstream
-  at `ship init` time, and only re-running it updates that file; `ship up`
-  warns if it ever falls out of sync with a hand-edited `serviceNames`.
+  With Nginx, `ship init` writes the app service name into
+  `ship/nginx/default.conf`. If you rename `app` by editing `ship.json`
+  directly, rerun `ship init` to update the upstream.
 - `externalNetwork` — a Docker network created outside `ship` (by another
   compose project, e.g. one running your shared MySQL/Redis/etc., or a
   reverse proxy), or a list of them (`["proxy", "monitoring"]`), attached in

@@ -171,6 +171,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -222,6 +223,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -245,6 +247,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -284,6 +287,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -394,6 +398,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -416,6 +421,7 @@ final class InitCommandServiceSelectionTest extends TestCase
             'no', // no processes of our own
             '', // no other PHP extensions
             '', // no external networks
+            '', // default Compose service names
             '8.4', '24',
         ]);
         $tester->execute([]);
@@ -433,7 +439,7 @@ final class InitCommandServiceSelectionTest extends TestCase
 
         $command = new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults()));
         $tester = new CommandTester($command);
-        $tester->setInputs(['', '', '', 'no', '', 'no', '', '', '8.4', '24']);
+        $tester->setInputs(['', '', '', 'no', '', 'no', '', '', '', '8.4', '24']);
         $tester->execute([]);
 
         self::assertSame('distroless', $this->shipJson()['siloImage']);
@@ -463,7 +469,7 @@ final class InitCommandServiceSelectionTest extends TestCase
     {
         $command = new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults()));
         $tester = new CommandTester($command);
-        $tester->setInputs(['', 'None', 'no', 'no', '', '', '8.1', '8.4']);
+        $tester->setInputs(['', 'None', 'no', 'no', '', '', '', '8.1', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('past end of life', $tester->getDisplay());
@@ -477,6 +483,27 @@ final class InitCommandServiceSelectionTest extends TestCase
         $name = $this->shipJson()['name'];
         self::assertMatchesRegularExpression(ShipConfig::NAME_PATTERN, $name);
         self::assertSame(strtolower(basename($this->projectRoot)), str_replace('_', '-', $name));
+    }
+
+    public function test_service_names_are_validated_and_written_into_the_nginx_upstream(): void
+    {
+        $registry = new ServiceRegistry(ServiceRegistry::defaults());
+        $tester = new CommandTester(new InitCommand($this->projectRoot, $registry));
+        $tester->setInputs([
+            'billing', 'Cache', 'Redis', 'no', 'no', '', 'proxy',
+            'app=redis', 'app=billing-app, webserver=billing-web, redis=billing-cache', '8.4', '24',
+        ]);
+        self::assertSame(0, $tester->execute([]));
+        self::assertStringContainsString('must be unique', $tester->getDisplay());
+        self::assertStringContainsString('app=billing-app', $tester->getDisplay());
+        self::assertSame(['app' => 'billing-app', 'webserver' => 'billing-web', 'redis' => 'billing-cache'], $this->shipJson()['serviceNames']);
+        self::assertStringContainsString('billing-app:9000', (string) file_get_contents($this->projectRoot . '/ship/nginx/default.conf'));
+
+        $rerun = new CommandTester(new InitCommand($this->projectRoot, $registry));
+        $rerun->setInputs(['', '', '', 'no', 'no', '', '', 'app=app', '8.4', '24']);
+        self::assertSame(0, $rerun->execute([]));
+        self::assertSame(['webserver' => 'billing-web', 'redis' => 'billing-cache'], $this->shipJson()['serviceNames']);
+        self::assertMatchesRegularExpression('/(?<![a-z0-9_-])app:9000/', (string) file_get_contents($this->projectRoot . '/ship/nginx/default.conf'));
     }
 
     public function test_re_running_init_keeps_the_projects_name(): void
