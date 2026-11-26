@@ -10,6 +10,8 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Ship\Console\Commands\InitCommand;
 use Ship\Console\Ui;
+use Ship\Services\PostgresService;
+use Ship\Services\RabbitMqService;
 use Ship\Services\ServiceRegistry;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -109,7 +111,7 @@ final class InitCommandLaravelPromptsTest extends TestCase
             Key::SPACE, Key::ENTER,
             // Database: the second service.
             Key::DOWN, Key::ENTER,
-            // At "Add a named service instance?": back to Database, which starts at the second service;
+            // At the named-instance prompt: back to Database, which starts at the second service;
             // the third instead.
             Key::CTRL_U,
             Key::DOWN, Key::ENTER,
@@ -132,5 +134,28 @@ final class InitCommandLaravelPromptsTest extends TestCase
         $config = json_decode((string) file_get_contents($this->projectRoot . '/ship.json'), associative: true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame($registry->inGroup('database')[2]->key(), $config['services']['database']);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_choosing_services_from_the_app_only_prompt_returns_to_the_checklist(): void
+    {
+        Prompt::fake([
+            Key::ENTER, // Keep the project name.
+            Key::ENTER, // Leave the checklist empty.
+            Key::DOWN, Key::ENTER, // Choose services.
+            Key::DOWN, Key::SPACE, Key::ENTER, // Tick Message broker.
+            Key::ENTER, // Select RabbitMQ.
+            ...array_fill(0, 9, Key::ENTER), // Keep the remaining defaults.
+        ]);
+
+        $tester = new CommandTester(new InitCommand(
+            $this->projectRoot,
+            new ServiceRegistry([new PostgresService(), new RabbitMqService()]),
+            ui: static fn (InputInterface $input, OutputInterface $output): Ui => new Ui($input, $output, rich: true),
+        ));
+
+        self::assertSame(0, $tester->execute([]));
+        $config = json_decode((string) file_get_contents($this->projectRoot . '/ship.json'), associative: true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['broker' => 'rabbitmq'], $config['services']);
     }
 }

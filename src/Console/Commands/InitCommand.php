@@ -32,6 +32,8 @@ final class InitCommand extends Command
     /** The "None" choice of a service menu. */
     private const NONE = '__none__';
 
+    private const NAMED_INSTANCES = '__named_instances__';
+
     private const PACKAGE_MANAGERS = ['npm' => 'npm', 'yarn' => 'Yarn', 'pnpm' => 'pnpm'];
 
     private readonly PackageManagerVersions $packageManagerVersions;
@@ -105,6 +107,13 @@ final class InitCommand extends Command
             }
         }
         $existingInstances = $existing->additionalServices ?? [];
+        $kindChoices = [];
+        foreach (array_keys($offered) as $group) {
+            $kindChoices[$group] = $this->groups()[$group][0];
+        }
+        if ($instanceChoices !== []) {
+            $kindChoices[self::NAMED_INSTANCES] = 'Named service instances';
+        }
 
         $minimumPhp = Frameworks::minimumPhp($this->projectRoot, $this->extensionFrameworkAdapters);
         $defaultPhp = $existing->phpVersion ?? ShipConfig::DEFAULT_PHP_VERSION;
@@ -135,10 +144,10 @@ final class InitCommand extends Command
                 name: 'name',
             )
             ->addIf(
-                $offered !== [],
-                fn (array $answers, mixed $previous): array => $ui->multiselect(
+                $kindChoices !== [],
+                static fn (array $answers, mixed $previous): array => $ui->multiselect(
                     'Which services does this project need?',
-                    array_map(fn (string $group): string => $this->groups()[$group][0], array_combine(array_keys($offered), array_keys($offered))),
+                    $kindChoices,
                     is_array($previous) ? array_values(array_map(strval(...), $previous)) : array_values(array_filter(
                         array_keys($offered),
                         static fn (string $group): bool => isset($offered[$group][$existing->services[$group] ?? '']),
@@ -166,14 +175,28 @@ final class InitCommand extends Command
 
         $form = $form
             ->addIf(
-                $instanceChoices !== [] || $existingInstances !== [],
+                static fn (array $answers): bool => $existingInstances !== [] || ($instanceChoices !== []
+                    && (self::selectedServices($answers) !== [] || in_array(self::NAMED_INSTANCES, $answers['kinds'] ?? [], true))),
                 // Going back to it keeps the instances added before (it then asks to add another).
                 fn (array $answers, mixed $previous): array => $this->promptForAdditionalInstances(
                     $ui,
                     $instanceChoices,
                     is_array($previous) ? ShipConfig::filterAdditionalServices($previous) : $existingInstances,
+                    hasPrimaryServices: self::selectedServices($answers) !== [],
                 ),
                 name: 'additionalServices',
+            )
+            ->addIf(
+                static fn (array $answers): bool => $kindChoices !== [] && self::selectedServices($answers) === [] && ($answers['additionalServices'] ?? []) === [],
+                static function () use ($ui, $form): void {
+                    if ($ui->select('Set up this project with just the app?', [
+                        'app-only' => 'Use only the app',
+                        'choose-services' => 'Choose services',
+                    ]) === 'choose-services') {
+                        $form->rewindTo('kinds');
+                    }
+                },
+                name: 'confirmAppOnly',
             )
             ->addIf(
                 static fn (array $answers): bool => self::usesSilo(self::selectedServices($answers), is_array($answers['additionalServices'] ?? null) ? $answers['additionalServices'] : []),
@@ -742,7 +765,7 @@ final class InitCommand extends Command
      * @param list<array{group: string, service: string, name: string}> $existing
      * @return list<array{group: string, service: string, name: string}>
      */
-    private function promptForAdditionalInstances(Ui $ui, array $choices, array $existing): array
+    private function promptForAdditionalInstances(Ui $ui, array $choices, array $existing, bool $hasPrimaryServices): array
     {
         $additional = $existing;
 
@@ -776,7 +799,11 @@ final class InitCommand extends Command
         $usedNames = array_column($additional, 'name');
         $groupChoices = array_keys($choices);
         while ($choices !== [] && $ui->confirm(
-            $additional === [] ? 'Add a named service instance?' : 'Add another named service instance?',
+            match (true) {
+                $additional !== [] => 'Add another named service instance?',
+                $hasPrimaryServices => 'Add another service as a named instance?',
+                default => 'Add a named service instance?',
+            },
             false,
             $additional === [] ? 'Each gets its own Compose service name and environment variable prefix' : '',
         )) {

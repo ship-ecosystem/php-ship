@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ship\Console;
 
+use Laravel\Prompts\Exceptions\FormRevertedException;
 use Laravel\Prompts\FormBuilder;
 
 /**
@@ -18,22 +19,40 @@ final class Form
 {
     private bool $hasSteps = false;
 
+    private ?string $rewindTarget = null;
+
     public function __construct(private readonly FormBuilder $form, private readonly Ui $ui)
     {
     }
 
     public function add(\Closure $step, string $name): self
     {
-        $this->form->add($this->offeringBack($step), $name);
-
-        return $this;
+        return $this->addIf(true, $step, $name);
     }
 
     public function addIf(\Closure|bool $condition, \Closure $step, string $name): self
     {
-        $this->form->addIf($condition, $this->offeringBack($step), $name);
+        // Laravel Prompts skips disabled steps while reverting.
+        $this->form->addIf(
+            fn (array $answers): bool => ($this->rewindTarget === null || $this->rewindTarget === $name)
+                && (is_bool($condition) ? $condition : $condition($answers)),
+            $this->offeringBack(function (array $answers, mixed $previous) use ($step): mixed {
+                $this->rewindTarget = null;
+
+                return $step($answers, $previous);
+            }),
+            $name,
+        );
 
         return $this;
+    }
+
+    /** Return to an earlier enabled step from within a step callback. */
+    public function rewindTo(string $name): never
+    {
+        $this->rewindTarget = $name;
+
+        throw new FormRevertedException();
     }
 
     /**

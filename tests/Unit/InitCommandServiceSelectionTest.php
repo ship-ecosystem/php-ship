@@ -44,7 +44,7 @@ final class InitCommandServiceSelectionTest extends TestCase
         $command = new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults()));
         $tester = new CommandTester($command);
         // The project name first (its default).
-        $tester->setInputs(['', ...$answers, '8.4']);
+        $tester->setInputs(['', ...$answers]);
         $tester->execute([]);
     }
 
@@ -475,7 +475,7 @@ final class InitCommandServiceSelectionTest extends TestCase
     {
         $command = new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults()));
         $tester = new CommandTester($command);
-        $tester->setInputs(['', 'None', 'no', 'no', '', '', '', '8.1', '8.4']);
+        $tester->setInputs(['', 'None', '', 'no', '', '', '', '8.1', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('past end of life', $tester->getDisplay());
@@ -516,16 +516,34 @@ final class InitCommandServiceSelectionTest extends TestCase
     public function test_only_the_app_name_is_prompted_when_no_optional_services_are_selected(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
-        $tester->setInputs(['billing', 'None', 'no', 'no', '', '', 'proxy', '8.4', '24']);
+        $tester->setInputs(['billing', 'None', 'Use only the app', 'no', '', '', 'proxy', '8.4', '24']);
 
         self::assertSame(0, $tester->execute([]));
         $display = $tester->getDisplay();
+        self::assertStringContainsString('Set up this project with just the app?', $display);
+        self::assertStringContainsString('Choose services', $display);
+        self::assertStringNotContainsString('Add a named service instance?', $display);
         self::assertStringContainsString('App service name [app]', $display);
         self::assertStringContainsString('default "app" if you are unsure', $display);
         self::assertStringContainsString('"billing-app"', $display);
         self::assertStringNotContainsString('Nginx service name', $display);
         self::assertStringNotContainsString('Compose service name for', $display);
         self::assertArrayNotHasKey('serviceNames', $this->shipJson());
+    }
+
+    public function test_choosing_services_after_an_empty_selection_reopens_the_full_picker(): void
+    {
+        $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
+        $tester->setInputs([
+            'billing', 'Database', 'None', 'Choose services',
+            'Message broker', 'RabbitMQ', 'no', 'no', '', '', '', '', '', '8.4', '24',
+        ]);
+
+        self::assertSame(0, $tester->execute([]));
+        $display = $tester->getDisplay();
+        self::assertSame(2, substr_count($display, 'Which services does this project need?'));
+        self::assertStringContainsString('Add another service as a named instance?', $display);
+        self::assertSame(['broker' => 'rabbitmq'], $this->shipJson()['services']);
     }
 
     public function test_re_running_init_keeps_the_projects_name(): void
@@ -540,7 +558,7 @@ final class InitCommandServiceSelectionTest extends TestCase
     public function test_a_name_the_schema_rejects_is_asked_again(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
-        $tester->setInputs(['My.App', 'my-app', 'None', 'no', 'no', '', '', '', '8.4']);
+        $tester->setInputs(['My.App', 'my-app', 'None', '', 'no', '', '', '', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('Lowercase letters and digits', $tester->getDisplay());
@@ -548,17 +566,18 @@ final class InitCommandServiceSelectionTest extends TestCase
     }
 
     /**
-     * With no service chosen, extra instances are simply the project's services, and plain
+     * The named instances can be the project's only optional services, and plain
      * questions say nothing about Ctrl+U, which only Prompts' own interface supports.
      */
-    public function test_with_no_services_chosen_it_offers_to_add_a_named_instance(): void
+    public function test_named_instances_can_be_selected_without_a_primary_service(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
-        $tester->setInputs(['', 'None', 'yes', 'Database', 'MySQL', 'analytics', 'no', 'no', '', '', '', '', '', '8.4']);
+        $tester->setInputs(['', 'Named service instances', 'yes', 'Database', 'MySQL', 'analytics', 'no', 'no', '', '', '', '', '', '8.4']);
         $tester->execute([]);
 
         self::assertStringContainsString('Add a named service instance?', $tester->getDisplay());
         self::assertStringContainsString('Add another named service instance?', $tester->getDisplay());
+        self::assertStringNotContainsString('Set up this project with just the app?', $tester->getDisplay());
         self::assertStringNotContainsString('Ctrl+U', $tester->getDisplay());
         self::assertSame([['group' => 'database', 'service' => 'mysql', 'name' => 'analytics']], $this->shipJson()['additionalServices']);
     }
@@ -606,7 +625,7 @@ final class InitCommandServiceSelectionTest extends TestCase
         $registry = new ServiceRegistry([new PostgresService(), $single, $extension]);
         $tester = new CommandTester(new InitCommand($this->projectRoot, $registry));
         $tester->setInputs([
-            '', 'None', 'yes', 'Database', 'PostgreSQL', 'reports',
+            '', 'Named service instances', 'yes', 'Database', 'PostgreSQL', 'reports',
             'yes', 'telemetry', 'Event collector', 'logs', 'no',
         ]);
 
