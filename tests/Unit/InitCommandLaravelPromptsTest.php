@@ -109,7 +109,7 @@ final class InitCommandLaravelPromptsTest extends TestCase
             Key::SPACE, Key::ENTER,
             // Database: the second service.
             Key::DOWN, Key::ENTER,
-            // At "Add a second instance…?": back to Database, which starts at the second service;
+            // At "Add a named service instance?": back to Database, which starts at the second service;
             // the third instead.
             Key::CTRL_U,
             Key::DOWN, Key::ENTER,

@@ -805,7 +805,7 @@ instance of a service, under a name of your choice:
 ```
 
 `ship init` offers to add these interactively too, right after the main
-picker ("Add a named additional service instance?"), and validates the
+picker (**Add a named service instance?**), and validates the
 name you type there. Editing `ship.json` by hand instead, that `name`
 must be lowercase letters, digits, and underscores only, starting with
 a letter (`analytics`, `queue_2` — not `Analytics`, `my analytics`, or
@@ -823,11 +823,11 @@ a letter (`analytics`, `queue_2` — not `Analytics`, `my analytics`, or
   that instance's shell specifically, instead of the default database's)
   both resolve unambiguously.
 
-Not every group supports this — only ones where a second instance
-actually means something: `database`, `cache`, `storage`, `search`, and
-`mail`. A second application runtime, frontend toolchain, testing
-driver, broadcasting server or message broker isn't a coherent idea, so
-those stay single-select only.
+The named-instance picker shows providers that support separate instances.
+In the built-in registry, those are databases, caches, object storage,
+search engines, and mail capture. Choose an application runtime, frontend
+toolchain, testing driver, broadcasting server, or message broker in the
+main service picker. Extensions can also offer named instances.
 
 ### Custom service names and an external network
 

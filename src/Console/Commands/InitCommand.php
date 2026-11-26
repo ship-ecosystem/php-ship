@@ -29,15 +29,10 @@ use Symfony\Component\Process\Process;
 #[AsCommand(name: 'init', description: 'Select services and generate ship.json + docker-compose.yml')]
 final class InitCommand extends Command
 {
-    // Groups whose services give each instance its own env var prefix and compose service name
-    // (see SupportsNamedInstances). Only one runtime, testing driver, frontend tool,
-    // broadcasting server or message broker makes sense per project.
     /** The "None" choice of a service menu. */
     private const NONE = '__none__';
 
     private const PACKAGE_MANAGERS = ['npm' => 'npm', 'yarn' => 'Yarn', 'pnpm' => 'pnpm'];
-
-    private const GROUPS_SUPPORTING_ADDITIONAL_INSTANCES = ['database', 'cache', 'storage', 'search', 'mail'];
 
     private readonly PackageManagerVersions $packageManagerVersions;
 
@@ -103,6 +98,13 @@ final class InitCommand extends Command
                 );
             }
         }
+        $instanceChoices = [];
+        foreach ($this->registry->all() as $service) {
+            if (ServiceRegistry::supportsNamedInstances($service)) {
+                $instanceChoices[$service->group()][$service->key()] = $service->label();
+            }
+        }
+        $existingInstances = $existing->additionalServices ?? [];
 
         $minimumPhp = Frameworks::minimumPhp($this->projectRoot, $this->extensionFrameworkAdapters);
         $defaultPhp = $existing->phpVersion ?? ShipConfig::DEFAULT_PHP_VERSION;
@@ -118,8 +120,6 @@ final class InitCommand extends Command
         // A step that asks nothing would send Ctrl+U straight back to where it came from, so steps
         // that might not ask (no services at all, Silo not chosen) are conditional: Prompts skips
         // them both ways.
-        $instanceGroups = array_values(array_intersect(self::GROUPS_SUPPORTING_ADDITIONAL_INSTANCES, array_keys($offered)));
-
         $form = $ui->form()
             // A release needs it, and it names the containers, images and data volumes on the
             // server, so it's asked first and kept once set.
@@ -166,12 +166,12 @@ final class InitCommand extends Command
 
         $form = $form
             ->addIf(
-                $instanceGroups !== [],
+                $instanceChoices !== [] || $existingInstances !== [],
                 // Going back to it keeps the instances added before (it then asks to add another).
                 fn (array $answers, mixed $previous): array => $this->promptForAdditionalInstances(
                     $ui,
-                    self::selectedServices($answers),
-                    is_array($previous) ? ShipConfig::filterAdditionalServices($previous) : ($existing->additionalServices ?? []),
+                    $instanceChoices,
+                    is_array($previous) ? ShipConfig::filterAdditionalServices($previous) : $existingInstances,
                 ),
                 name: 'additionalServices',
             )
@@ -325,7 +325,8 @@ final class InitCommand extends Command
         $this->publishStubs($selected, $additionalServices, $config->serviceNames['app'] ?? 'app');
 
         foreach ($additionalServices as $instance) {
-            $summary[] = ["{$this->groups()[$instance['group']][0]} \"{$instance['name']}\"", $this->serviceLabel($instance['group'], $instance['service'])];
+            $label = $this->groups()[$instance['group']][0] ?? $instance['group'];
+            $summary[] = ["{$label} \"{$instance['name']}\"", $this->serviceLabel($instance['group'], $instance['service'])];
         }
         $ui->table(['Service', 'Choice'], [
             ...($summary === [] ? [['Services', 'None']] : $summary),
@@ -737,27 +738,13 @@ final class InitCommand extends Command
      * Offers extra named instances beyond the one-per-group selection above (a second database, a
      * second Redis). Each answer becomes a ship.json `additionalServices` entry.
      *
-     * $existing entries are kept as-is rather than re-prompted for; remove one by editing
-     * ship.json.
-     *
-     * @param array<string, string> $selected the services chosen above; with none, these are simply
-     *        the project's services
+     * @param array<string, array<string, string>> $choices eligible providers and labels by group
      * @param list<array{group: string, service: string, name: string}> $existing
      * @return list<array{group: string, service: string, name: string}>
      */
-    private function promptForAdditionalInstances(Ui $ui, array $selected, array $existing = []): array
+    private function promptForAdditionalInstances(Ui $ui, array $choices, array $existing): array
     {
         $additional = $existing;
-        $usedNames = array_map(static fn (array $a): string => $a['name'], $existing);
-
-        $groupChoices = array_values(array_filter(
-            self::GROUPS_SUPPORTING_ADDITIONAL_INSTANCES,
-            fn (string $group): bool => $this->registry->inGroup($group) !== [],
-        ));
-
-        if ($groupChoices === []) {
-            return $additional;
-        }
 
         // The instances ship.json already has, shown so they can be seen and removed (to change
         // one, untick it and add it again: its name and service make its container and volume).
@@ -773,7 +760,7 @@ final class InitCommand extends Command
             }
 
             $kept = $ui->multiselect(
-                $selected === [] ? 'Keep these services?' : 'Keep these service instances?',
+                'Keep these named service instances?',
                 $options,
                 array_keys($options),
                 'Untick to remove; its data volume stays',
@@ -784,29 +771,20 @@ final class InitCommand extends Command
                 static fn (int $index): bool => in_array("instance-{$index}", $kept, true),
                 ARRAY_FILTER_USE_KEY,
             ));
-            $usedNames = array_map(static fn (array $a): string => $a['name'], $additional);
         }
 
-        while ($ui->confirm(
-            // With no service chosen above, these are simply the project's services.
-            match (true) {
-                $selected === [] && $additional === [] => 'Add a service?',
-                $selected === [] => 'Add another service?',
-                $additional === [] => 'Add a second instance of a service, e.g. a second database?',
-                default => 'Add another one?',
-            },
+        $usedNames = array_column($additional, 'name');
+        $groupChoices = array_keys($choices);
+        while ($choices !== [] && $ui->confirm(
+            $additional === [] ? 'Add a named service instance?' : 'Add another named service instance?',
             false,
-            $additional === [] ? 'Each gets its own container, volume and env var prefix' : '',
+            $additional === [] ? 'Each gets its own Compose service name and environment variable prefix' : '',
         )) {
             $group = $ui->select('Which kind of service?', array_combine(
                 $groupChoices,
-                array_map(fn (string $group): string => $this->groups()[$group][0], $groupChoices),
+                array_map(fn (string $group): string => $this->groups()[$group][0] ?? $group, $groupChoices),
             ));
-            $options = $this->registry->inGroup($group);
-            $service = $ui->select('Which one?', array_combine(
-                array_map(static fn ($s) => $s->key(), $options),
-                array_map(static fn ($s) => $s->label(), $options),
-            ));
+            $service = $ui->select('Which one?', $choices[$group]);
 
             // The name becomes a compose service suffix and an env var prefix (see
             // SupportsNamedInstances); anything outside this charset breaks one or the other.

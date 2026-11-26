@@ -12,7 +12,6 @@ use Ship\Contracts\ShipEnvironment;
 use Ship\Node\PackageManager;
 use Ship\Services\OctaneSwooleService;
 use Ship\Services\ServiceRegistry;
-use Ship\Services\SupportsNamedInstances;
 use Ship\Support\PhpSecurityFloor;
 use Symfony\Component\Yaml\Yaml;
 
@@ -482,9 +481,7 @@ final class ComposeFileBuilder
     private function assertAdditionalServicesSupportNamedInstances(array $additionalServices): void
     {
         foreach ($additionalServices as $additional) {
-            $service = $this->registry->get($additional['service']);
-
-            if (!in_array(SupportsNamedInstances::class, class_uses($service), true)) {
+            if (!ServiceRegistry::supportsNamedInstances($this->registry->get($additional['service']))) {
                 throw new \InvalidArgumentException(
                     "ship.json additionalServices: \"{$additional['service']}\" doesn't support more "
                         . 'than one instance -- only its default selection (or none) can be used.',

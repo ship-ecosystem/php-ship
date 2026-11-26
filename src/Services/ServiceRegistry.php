@@ -37,6 +37,11 @@ final class ServiceRegistry
         return isset($this->services[$key]);
     }
 
+    public static function supportsNamedInstances(ServiceDefinition $service): bool
+    {
+        return in_array(SupportsNamedInstances::class, class_uses($service), true);
+    }
+
     /**
      * @return list<ServiceDefinition>
      */

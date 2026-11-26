@@ -8,11 +8,17 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Ship\Config\ShipConfig;
 use Ship\Console\Commands\InitCommand;
+use Ship\Contracts\ServiceDefinition;
+use Ship\Contracts\ShipEnvironment;
+use Ship\Docker\ComposeFileBuilder;
+use Ship\Services\PostgresService;
 use Ship\Services\ServiceRegistry;
 use Ship\Services\SiloService;
+use Ship\Services\SupportsNamedInstances;
 use Ship\Support\ShipVersion;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Covers that the picker's answers land in ship.json under the right group keys, and that
@@ -545,16 +551,73 @@ final class InitCommandServiceSelectionTest extends TestCase
      * With no service chosen, extra instances are simply the project's services, and plain
      * questions say nothing about Ctrl+U, which only Prompts' own interface supports.
      */
-    public function test_with_no_services_chosen_it_offers_to_add_a_service(): void
+    public function test_with_no_services_chosen_it_offers_to_add_a_named_instance(): void
     {
         $tester = new CommandTester(new InitCommand($this->projectRoot, new ServiceRegistry(ServiceRegistry::defaults())));
         $tester->setInputs(['', 'None', 'yes', 'Database', 'MySQL', 'analytics', 'no', 'no', '', '', '', '', '', '8.4']);
         $tester->execute([]);
 
-        self::assertStringContainsString('Add a service?', $tester->getDisplay());
-        self::assertStringContainsString('Add another service?', $tester->getDisplay());
-        self::assertStringNotContainsString('second instance', $tester->getDisplay());
+        self::assertStringContainsString('Add a named service instance?', $tester->getDisplay());
+        self::assertStringContainsString('Add another named service instance?', $tester->getDisplay());
         self::assertStringNotContainsString('Ctrl+U', $tester->getDisplay());
         self::assertSame([['group' => 'database', 'service' => 'mysql', 'name' => 'analytics']], $this->shipJson()['additionalServices']);
+    }
+
+    public function test_the_named_instance_picker_matches_provider_capabilities(): void
+    {
+        $single = $this->createStub(ServiceDefinition::class);
+        $single->method('key')->willReturn('single-db');
+        $single->method('label')->willReturn('Single-instance database');
+        $single->method('group')->willReturn('database');
+
+        $extension = new class () implements ServiceDefinition {
+            use SupportsNamedInstances;
+
+            public function key(): string
+            {
+                return 'event-collector';
+            }
+
+            public function label(): string
+            {
+                return 'Event collector';
+            }
+
+            public function group(): string
+            {
+                return 'telemetry';
+            }
+
+            public function composeFragment(ShipEnvironment $environment, ?string $instanceName = null): array
+            {
+                return [$this->composeServiceName($instanceName) => ['image' => 'busybox:1']];
+            }
+
+            public function environmentVariables(?string $instanceName = null): array
+            {
+                return [$this->envPrefix($instanceName) . 'COLLECTOR_HOST' => $this->composeServiceName($instanceName)];
+            }
+
+            public function removes(): array
+            {
+                return [];
+            }
+        };
+        $registry = new ServiceRegistry([new PostgresService(), $single, $extension]);
+        $tester = new CommandTester(new InitCommand($this->projectRoot, $registry));
+        $tester->setInputs([
+            '', 'None', 'yes', 'Database', 'PostgreSQL', 'reports',
+            'yes', 'telemetry', 'Event collector', 'logs', 'no',
+        ]);
+
+        self::assertSame(0, $tester->execute([]));
+        self::assertStringNotContainsString('Single-instance database', $tester->getDisplay());
+        self::assertSame([
+            ['group' => 'database', 'service' => 'postgres', 'name' => 'reports'],
+            ['group' => 'telemetry', 'service' => 'event-collector', 'name' => 'logs'],
+        ], $this->shipJson()['additionalServices']);
+        $config = ShipConfig::fromFile($this->projectRoot . '/ship.json');
+        $compose = Yaml::parse((new ComposeFileBuilder($registry))->build($config, ShipEnvironment::Development));
+        self::assertArrayHasKey('event-collector-logs', $compose['services']);
     }
 }
